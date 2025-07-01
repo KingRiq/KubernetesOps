@@ -4,10 +4,6 @@
 - name: Set static IP on Rocky Linux with dynamic interface detection
   hosts: localhost
   become: yes
-  vars:
-    static_ip: 192.168.1.103
-    gateway: 192.168.1.1
-    dns: 192.168.1.1
 
   tasks:
     - name: Find active ethernet interface
@@ -38,13 +34,12 @@
 
     - name: Configure static IP using nmcli (manual method)
       command: >
-        nmcli con mod "{{ eth_iface }}"
-        ipv4.addresses "{{ static_ip }}/24"
-        ipv4.gateway "{{ gateway }}"
-        ipv4.dns "{{ dns }}"
-        ipv4.method manual
+        nmcli con mod "{{ eth_iface }}" ipv4.method auto
+        ipv4.addresses ""
+        ipv4.gateway ""
+        ipv4.dns ""
 
-    - name: Reload NetworkManager connections (avoid disconnect)
+    - name: Update NetworkManager connections
       command: nmcli con up "{{ eth_iface }}"
 
     - name: Wait for network to stabilize
