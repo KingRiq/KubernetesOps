@@ -1,0 +1,22 @@
+all:
+  hosts:
+    control-plane:
+      ansible_host: 172.25.148.107
+      static_ip: 192.168.1.101
+    worker1:
+      ansible_host: 172.25.159.135
+      static_ip: 192.168.1.102
+
+
+Galaxia:
+  children:
+    control:
+    workers:
+    
+control:
+  hosts:
+    control-plane:
+
+workers:
+  hosts:
+    worker1:
