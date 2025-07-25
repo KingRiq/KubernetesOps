@@ -1,7 +1,7 @@
 # This playbook will set the specified host to a static ip address
 # utility for uniformity of the ip addresses
 
-- import_playbook: Evaluate_Ip.yml
+- import_playbook: evaluate_ip.yml
 - name: Set static IP on Rocky Linux with dynamic interface detection
   hosts: ClusterGroup
   become: yes
@@ -17,8 +17,6 @@
       loop: "{{ nmcli_output.stdout_lines }}"
       when: "'ethernet' in item"
       register: iface_fact
-
-
 
     - name: Debug parsed ethernet interfaces
       debug:
