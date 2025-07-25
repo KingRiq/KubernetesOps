@@ -1,0 +1,80 @@
+# This playbook will set the specified host to a static ip address
+# utility for uniformity of the ip addresses
+
+#playbook to determine whether we are using the default ip or the static ip set
+
+- import_playbook: evaluate_ip.yml
+- name: Set static IPs on Rocky Linux with dynamic interface detection
+  hosts: ClusterGroup
+  become: yes
+  tasks:
+    - name: Find active ethernet interface
+      command: nmcli -t -f DEVICE,TYPE device status
+      register: nmcli_output
+
+    - name: Parse ethernet interface name
+      set_fact:
+        eth_iface: "{{ item.split(':')[0] }}"
+      loop: "{{ nmcli_output.stdout_lines }}"
+      when: "'ethernet' in item"
+      register: iface_fact
+
+    - name: Debug parsed ethernet interfaces
+      debug:
+        var: iface_fact.results
+
+    - name: Set interface fact from first ethernet device found
+      set_fact:
+        eth_iface: "{{ iface_fact.results 
+                   | rejectattr('skipped', 'defined') 
+                   | map(attribute='ansible_facts.eth_iface') 
+                   | first }}"   
+
+    - name: Debug selected interface
+      debug:
+        var: eth_iface
+
+    - name: Set interface fact from 2nd ethernet device found
+      set_fact:
+        eth_iface2: "{{ (iface_fact.results
+                        | rejectattr('skipped', 'defined')
+                        | map(attribute='ansible_facts.eth_iface')
+                        | list)[1] }}"
+      when: >
+        (iface_fact.results 
+        | rejectattr('skipped', 'defined') 
+        | map(attribute='ansible_facts.eth_iface') 
+        | list 
+        | length) >= 2  
+
+    - name: Debug selected interface
+      debug:
+        var: eth_iface2
+
+    - name: Configure External IP using nmcli (manual method)
+      command: >
+        nmcli con mod "{{ eth_iface }}" ipv4.method auto
+        ipv4.addresses ""
+        ipv4.gateway ""
+        ipv4.dns ""
+
+    - name: Configure Internal IP using nmcli (manual method)
+      command: >
+        nmcli con mod "{{ eth_iface2}}" ipv4.method auto
+        ipv4.addresses ""
+        ipv4.gateway ""
+        ipv4.dns ""
+
+    - name: Reboot
+      command: "reboot"
+      ignore_errors: true
+      # failures are thrown because it lost connection to the host immediately. Ignore them.
+
+        
+    - name: Confirm interface IP
+      command: ip -4 addr show dev "{{ eth_iface }}"
+      register: ip_check
+
+    - name: Display assigned IP
+      debug:
+        var: ip_check.stdout_lines
