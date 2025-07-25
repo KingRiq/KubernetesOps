@@ -1,0 +1,16 @@
+all:
+  hosts:
+    dev:
+      ansible_host: 172.22.0.200
+      static_ip: 192.168.1.200
+  vars:
+    netmask: 16
+
+ClusterGroup:
+  children:
+    develop:
+    
+develop:
+  hosts:
+    dev:
+

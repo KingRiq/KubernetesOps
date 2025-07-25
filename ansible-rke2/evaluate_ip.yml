@@ -1,0 +1,55 @@
+- hosts: ClusterGroup
+  gather_facts: no
+  vars:
+    external_ip: "{{ hostvars[inventory_hostname].external_address.ip }}"
+    internal_ip: "{{ hostvars[inventory_hostname].internal_address.ip }}"
+    original_ip: "{{ ansible_host }}"
+
+  tasks:
+    - block:
+        - name: Verify SSH via External IP
+          wait_for_connection:
+            timeout: 5
+          register: res_external
+          delegate_to: "{{ external_ip }}"
+
+        - name: Set SSH to External IP
+          set_fact:
+            ansible_host: "{{ external_ip }}"
+          when: res_external is succeeded
+
+      rescue:
+        - block:
+          - name: Verify SSH via Internal IP
+            wait_for_connection:
+              timeout: 5
+            register: res_internal
+            delegate_to: "{{ internal_ip }}"
+
+
+          - name: Fallback - Use internal IP
+            set_fact:
+              ansible_host: "{{ internal_ip }}"
+            when: res_internal is succeeded
+
+          rescue:
+            - name: Verify SSH via Originally Configured IP
+              wait_for_connection:
+                timeout: 5
+              register: res_original_ip
+              delegate_to: "{{ original_ip }}"
+
+            - name: Fallback - uUse Original IP
+              set_fact:
+                ansible_host: "{{ original_ip }}" 
+
+            - name: Nothing is reachable give up bruh
+              fail:
+                msg: >-
+                  Nothing is reachable give up bruh
+              when: res_original_ip is failed   
+        
+
+    - name: Confirm final ansible_host
+      debug:
+        msg: "Using connection host {{ ansible_host }}"
