@@ -1,0 +1,13 @@
+# Static Host Entries
+127.0.0.1   localhost localhost.localdomain
+::1         localhost localhost.localdomain
+
+# Control Plane Nodes
+{% for control in groups['control'] %}
+{{ hostvars[control].ansible_host }}  {{ control }}
+{% endfor %}
+
+# Worker Nodes
+{% for worker in groups['workers'] %}
+{{ hostvars[worker].ansible_host }}  {{ worker }}
+{% endfor %}

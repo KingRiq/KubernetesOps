@@ -62,10 +62,8 @@
       command: >
         nmcli con mod "{{ eth_iface2 }}"
         ipv4.addresses "{{ internal_address.ip }}/{{ netmask }}"
-        ipv4.gateway "{{ internal_address.gateway }}"
-        ipv4.dns "{{ internal_address.dns }}"
         ipv4.method manual
-
+      # setting gateway adds a default route which annoying might take precedence over BRIDGED VMs internet access
 
     - name: Reboot because it's cleaner
       command: "reboot"

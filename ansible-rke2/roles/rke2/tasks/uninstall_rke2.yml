@@ -1,0 +1,71 @@
+---
+
+# - name: Gather service facts
+#   ansible.builtin.service_facts:
+
+# - name: Debug service facts
+#   debug:
+#     var: ansible_facts.services
+
+
+# - name: Stop and disable Kubelet (if present)
+#   systemd:
+#     name: kubelet
+#     enabled: false
+#     state: stopped
+#   when: "'kubelet.service' in ansible_facts.services"
+
+# - name: Stop and disable containerd (if present)
+#   systemd:
+#     name: containerd
+#     enabled: false
+#     state: stopped
+#   when: "'containerd.service' in ansible_facts.services"
+
+  #optimize to do both at the same time
+  #TODO (low value)
+
+- name: Run uninstall script (if exists)
+  command: /usr/bin/rke2-uninstall.sh
+  register: uninstall_result
+  failed_when: false
+  ignore_errors: true
+  #incase it wasn't installed properly
+
+- name: Kill processes holding on to kubelet dir
+  shell: "fuser -k /var/lib/kubelet || true"
+
+- name: Remove known RKE2 files and directories
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ rke2_cleanup_paths }}"
+
+- name: List currently open ports
+  command: firewall-cmd --list-ports
+  register: open_ports
+  changed_when: false
+
+- name: Close all open ports
+  firewalld:
+    zone: public
+    port: "{{ item }}"
+    permanent: true
+    state: disabled
+  loop: "{{ open_ports.stdout | split(' ') }}"
+  when: open_ports.stdout_lines | length > 0
+
+- name: Reload firewall to apply changes
+  command: firewall-cmd --reload
+  when: open_ports.stdout_lines | length > 0
+
+- name: Verify that all ports are closed
+  command: firewall-cmd --list-ports
+  register: remaining_ports
+  changed_when: false
+
+- name: Show remaining open ports (if any)
+  debug:
+    msg: "Remaining open ports: {{ remaining_ports.stdout }}"
+  when: remaining_ports.stdout | length > 0
+
