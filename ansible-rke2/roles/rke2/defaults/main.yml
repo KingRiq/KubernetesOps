@@ -1,0 +1,12 @@
+rke2_cleanup_paths:
+  - /etc/rancher/rke2
+  - /var/lib/rancher/rke2
+  - /usr/local/bin/rke2
+  - /usr/local/bin/rke2-uninstall.sh
+  - /etc/systemd/system/rke2-server.service
+  - /etc/systemd/system/rke2-agent.service
+  - /var/lib/kubelet
+  - /var/lib/containerd
+  - /etc/cni
+  - /opt/cni
+  - /var/run/flannel

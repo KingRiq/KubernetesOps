@@ -1,0 +1,20 @@
+---
+
+- import_playbook: evaluate_ip.yml
+- name: Preconfigure RKE2 nodes 
+  hosts: ClusterGroup
+  become: true
+  roles:
+    - rke2
+
+# - name: Setup RKE2 control plane
+#   hosts: control
+#   become: true
+#   roles:
+#     - control
+
+# - name: Setup RKE2 workers
+#   hosts: workers
+#   become: true
+#   roles:
+#     - workers

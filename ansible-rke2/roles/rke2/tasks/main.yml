@@ -1,0 +1,6 @@
+---
+- include_tasks: install_rke2.yml
+  when: state == 'present'
+
+- include_tasks: uninstall_rke2.yml
+  when: state == 'absent'

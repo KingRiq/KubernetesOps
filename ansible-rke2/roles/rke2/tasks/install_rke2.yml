@@ -1,0 +1,38 @@
+- name: Set hostname on all nodes
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Deploy /etc/hosts from template
+  template:
+    src: templates/hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Restart NetworkManager
+  service:
+    name: NetworkManager
+    state: restarted
+
+- name: Open required ports
+  firewalld:
+    port: "{{ item }}/tcp"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop: "{{ rke_ports }}"
+
+- name: Download and install RKE2
+  shell: |
+    curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE={{ 'server' if inventory_hostname in groups['control'] else 'agent' }} sh -
+  args:
+    creates: /usr/local/bin/rke2
+
+- name: Create RKE2 config directory
+  file:
+    path: /etc/rancher/rke2
+    state: directory
+    mode: '0755'
+
+- include_tasks: configure_rke2.yml
