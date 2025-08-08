@@ -1,0 +1,40 @@
+---
+
+#Mount a file share from a host machine (I don't have a current usecase for this yet. Going to try the nextcloud solutation and see how that works out before I proceed with this approach)
+- import_playbook: evaluate_ip.yml
+- name: Mount SMB share on Linux nodes
+  hosts: all
+  become: yes
+  vars:
+    smb_version: "3.1.1"
+    fstype: "cifs"
+
+  tasks:
+    - name: Install cifs-utils package
+      package:
+        name: cifs-utils
+        state: present
+
+    - name: Create mount directory
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Mount the SMB share
+      mount:
+        path: "{{ mount_point }}"
+        src: "{{ smb_share }}"
+        fstype: cifs
+        opts: "username={{ smb_username }},password={{ smb_password }},domain={{ smb_domain }},vers={{ smb_version }},rw"
+        state: mounted
+
+    - name: Ensure the SMB share is mounted on boot (fstab)
+      mount:
+        path: "{{ mount_point }}"
+        src: "{{ smb_share }}"
+        fstype: cifs
+        opts: "username={{ smb_username }},password={{ smb_password }},domain={{ smb_domain }},vers={{ smb_version }},rw"
+        state: present

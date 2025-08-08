@@ -1,0 +1,5 @@
+- name: Deploy Nextcloud on RKE2
+  hosts: ClusterGroup
+  gather_facts: no
+  roles:
+    - nextcloud
