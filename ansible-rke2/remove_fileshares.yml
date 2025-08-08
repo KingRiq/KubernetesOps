@@ -1,0 +1,25 @@
+---
+- import_playbook: evaluate_ip.yml
+- name: Unmount and clean up SMB share from Linux nodes
+  hosts: all
+  become: yes
+  vars:
+    fstype: "cifs"
+
+  tasks:
+    - name: Unmount the SMB share if mounted
+      mount:
+        path: "{{ mount_point }}"
+        fstype: "{{ fstype }}"
+        state: unmounted
+
+    - name: Remove fstab entry (if it exists)
+      mount:
+        path: "{{ mount_point }}"
+        fstype: "{{ fstype }}"
+        state: absent
+
+    - name: Remove mount directory
+      file:
+        path: "{{ mount_point }}"
+        state: absent

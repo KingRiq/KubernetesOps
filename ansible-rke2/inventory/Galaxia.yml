@@ -20,6 +20,26 @@ all:
         ip: 192.168.0.101
         gateway: 192.168.0.1
         dns: 192.168.0.1
+    worker2:
+      ansible_host: 59.22.6.131
+      internal_address:
+        ip: 59.22.6.102
+        gateway: 59.22.0.1
+        dns: 59.22.0.1
+      external_address:
+        ip: 192.168.0.102
+        gateway: 192.168.0.1
+        dns: 192.168.0.1
+    worker3:
+      ansible_host: 59.22.6.132
+      internal_address:
+        ip: 59.22.6.103
+        gateway: 59.22.0.1
+        dns: 59.22.0.1
+      external_address:
+        ip: 192.168.0.103
+        gateway: 192.168.0.1
+        dns: 192.168.0.1
 
   vars:
     netmask: 24
@@ -35,4 +55,4 @@ control:
 
 workers:
   hosts:
-    worker1:
+    worker[1:3]:

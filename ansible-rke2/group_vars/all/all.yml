@@ -1,22 +1,5 @@
 ansible_become_pass: "{{ ansible_ssh_pass }}"
 ansible_user: rocky9
-nmcli_nics:
-  - name: ens160
-    ip4: 192.168.0.225/24
-    gw4: 192.168.0.1
-    dns4: ["8.8.8.8", "1.1.1.1"]
-  - name: ens161
-    ip4: 192.168.0.100/24
-    gw4: 192.168.0.1
-    dns4: ["8.8.8.8", "1.1.1.1"]
-  - name: ens224
-    ip4: 10.10.10.100/24
-    gw4: 10.10.10.2
-    dns4: ["8.8.8.8"]
-  - name: ens256
-    ip4: 172.16.0.100/24
-    gw4: 172.16.0.1
-    dns4: ["8.8.8.8"]
   
 rke_ports:
   - 9345
