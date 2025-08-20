@@ -17,7 +17,7 @@
 
 - name: Open required ports
   firewalld:
-    port: "{{ item }}/tcp"
+    port: "{{ item.port }}/{{ item.protocol }}"    
     permanent: yes
     state: enabled
     immediate: yes

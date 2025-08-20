@@ -1,0 +1,26 @@
+mariadb:
+  enabled: false
+
+nextcloud:
+  host: cloud.lan
+  username: admin
+  password: changeme
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 8Gi
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: cloud.lan
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
