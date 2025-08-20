@@ -1,5 +1,8 @@
+- import_playbook: evaluate_ip.yml
+- import_playbook: install_helm.yml
 - name: Deploy Nextcloud on RKE2
-  hosts: ClusterGroup
+  hosts: control
+  become: true
   gather_facts: no
   roles:
     - nextcloud

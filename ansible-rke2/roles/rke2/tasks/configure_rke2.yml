@@ -1,14 +1,12 @@
 ---
-# - name: Configure RKE2 server
-#   copy:
-#     dest: /etc/rancher/rke2/config.yaml
-#     content: |
-#       write-kubeconfig-mode: "0755"
-#       tls-san:
-#         - "{{ ansible_host }}"
-#       advertise-address: "{{ ansible_host }}"
-#     mode: '0755'
-#   when: inventory_hostname in groups['control']
+- name: Configure RKE2 server with ServiceLB enabled
+  copy:
+    dest: /etc/rancher/rke2/config.yaml
+    content: |
+      cluster-dns: 10.43.0.10
+    mode: '0755'
+  when: inventory_hostname in groups['control']
+      # enable-servicelb: true
 
 - name: Enable the rke2-server
   systemd:
@@ -21,7 +19,6 @@
     name: rke2-server
     state: started
   when: inventory_hostname in groups['control']
-
 
 - name: Add RKE2 bin directory to root's .bashrc
   lineinfile:
@@ -52,7 +49,7 @@
 
 - name: Set token fact on control plane node
   set_fact:
-    rke2_token: "{{ rke2_token_file.content | b64decode | trim }}"  
+    rke2_token: "{{ rke2_token_file.content | b64decode | trim }}"
   when: inventory_hostname in groups['control']
 
 - name: Debug token on control-plane
@@ -85,57 +82,47 @@
     name: rke2-agent
     state: started
   when: inventory_hostname in groups['workers']
-  
-# - name: Enable and start rke2-agent service
-#   systemd:
-#     name: rke2-agent
-#     enabled: yes
-#     state: started
-#   when: inventory_hostname in groups['workers']
 
-# - name: Get latest stable kubectl version
-#   set_fact:
-#     kubectl_version: "{{ lookup('url', 'https://dl.k8s.io/release/stable.txt') | trim }}"
-
-# - name: Download latest stable kubectl binary
-#   get_url:
-#     url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl"
-#     dest: /usr/bin/kubectl
-#     mode: '0755'
-#   become: yes
-
-# # - name: Restart rke2-server for config changes to take effect
-# #   systemd:
-# #     name: rke2-server
-# #     state: restarted
-# #     enabled: yes
-# #   when: inventory_hostname in groups['control']
-
-# - name: Wait for RKE2 API server to be ready
-#   wait_for:
-#     host: "{{ ansible_host }}"
-#     port: 6443
-#     timeout: 120
+# - name: Create ingress-nginx LoadBalancer Service (control-plane only)
+#   command: /var/lib/rancher/rke2/bin/kubectl apply -f -
+#   args:
+#     stdin: |
+#       apiVersion: v1
+#       kind: Service
+#       metadata:
+#         name: ingress-nginx-lb
+#         namespace: kube-system
+#       spec:
+#         type: LoadBalancer
+#         selector:
+#           app.kubernetes.io/name: rke2-ingress-nginx
+#           app.kubernetes.io/component: controller
+#         ports:
+#           - name: http
+#             port: 80
+#             targetPort: 80
+#           - name: https
+#             port: 443
+#             targetPort: 443
+#   environment:
+#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+#   run_once: true
 #   when: inventory_hostname in groups['control']
 
-# - name: Update kubeconfig server address to external IP on control plane
-#   replace:
-#     path: /etc/rancher/rke2/rke2.yaml
-#     regexp: 'server: https://127\.0\.0\.1:6443'
-#     replace: "server: https://{{ ansible_host }}:6443"
-#   when: inventory_hostname in groups['control']
+# - name: Wait for EXTERNAL-IP
+#   command: >
+#     /var/lib/rancher/rke2/bin/kubectl -n kube-system get svc ingress-nginx-lb
+#     -o jsonpath='{.status.loadBalancer.ingress[*].ip}'
+#   environment:
+#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+#   register: ingress_ip
+#   until: ingress_ip.stdout | length > 0 and ingress_ip.stdout != "<pending>"
+#   retries: 40
+#   delay: 3
+#   changed_when: false
+#   run_once: true
+#   delegate_to: "{{ groups['control'][0] }}"
 
-# - name: Ensure the certificate authority is included in the kubeconfig
-#   copy:
-#     dest: /etc/rancher/rke2/rke2.yaml
-#     content: |
-#       certificate-authority: /var/lib/rancher/rke2/server/tls/server-ca.crt
-#     mode: '0644'
-#   when: inventory_hostname in groups['control']
+# - debug:
+#     msg: "Ingress LB IP(s): {{ ingress_ip.stdout }}"
 
-# - name: Set KUBECONFIG environment variable for users
-#   lineinfile:
-#     path: /etc/profile.d/kubeconfig.sh
-#     line: "export KUBECONFIG=/etc/rancher/rke2/rke2.yaml"
-#     create: yes
-#   become: yes

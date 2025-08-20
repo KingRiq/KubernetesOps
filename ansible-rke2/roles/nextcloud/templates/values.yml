@@ -1,0 +1,34 @@
+mariadb:
+  enabled: false  
+nextcloud:
+  host: 192.168.0.100          
+  username: admin
+  password: changeme
+  trustedDomains:             
+    - 192.168.0.100
+    - 192.168.0.101
+    - 192.168.0.102
+    - 192.168.0.103
+    - nextcloud.default.svc
+    - nextcloud.default.svc.cluster.local
+
+persistence:
+  enabled: false
+#   storageClass: ""             # empty = cluster default
+#   accessMode: ReadWriteOnce
+#   size: 8Gi
+
+service:
+  type: NodePort
+  port: 80                     
+  nodePort: 30080
+
+ingress:
+  enabled: false
+
+# securityContext:
+#   enabled: true
+#   runAsUser: 33
+#   runAsGroup: 33
+#   fsGroup: 33
+#   fsGroupChangePolicy: "OnRootMismatch"

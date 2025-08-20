@@ -2,6 +2,13 @@ ansible_become_pass: "{{ ansible_ssh_pass }}"
 ansible_user: rocky9
   
 rke_ports:
-  - 9345
-  - 6443
-  - 10250
+  - port: 53
+    protocol: tcp 
+  - port: 53
+    protocol: udp
+  - port: 9345
+    protocol: tcp
+  - port: 6443
+    protocol: tcp
+  - port: 10250
+    protocol: tcp

@@ -1,0 +1,79 @@
+---
+#Sometimes you don't have helm installed on your ansible controller
+#Sucks to suck.. lets install it I guess
+
+- name: Install Latest Helm
+  hosts: control
+  become: yes
+  vars: 
+    helm_arch: linux-amd64
+    helm_base_url: "https://get.helm.sh"
+
+  tasks:
+    - name: Ensure requireed packages are presnet (Rocky9)
+      dnf:
+        name:
+          - curl
+          - tar
+          - jq
+          - coreutils
+        state: present
+
+    - name: Get latest Helm version from Github
+      shell: |
+         curl -s https://api.github.com/repos/helm/helm/releases/latest | jq -r .tag_name
+      register: latest_helm_version
+
+    - name: Set Helm version fact
+      set_fact:
+        helm_version: "{{ latest_helm_version.stdout }}"
+
+    - name: debug var
+      debug:
+        var: latest_helm_version
+
+    - name: Create temp directory for Helm 
+      tempfile: 
+        state: directory
+        suffix: helm
+      register: tmp_dir
+
+    - name: debug var
+      debug:
+        var: tmp_dir
+    
+    - name: set fact for helm location
+      set_fact: 
+        helm_package: "{{ tmp_dir.path }}/helm.tar.gz"
+
+    
+    - name: Download Helm tarball
+      get_url:
+        url: "{{ helm_base_url }}/helm-{{ helm_version }}-{{ helm_arch }}.tar.gz"
+        dest: "{{ helm_package }}"
+      # delegate_to: localhost
+
+    # I dont care to verify the checksum let's just assume it works
+
+    - name: Extract helm
+      unarchive:
+        src: "{{ helm_package }}"
+        dest: "{{ tmp_dir.path }}"
+        remote_src: yes
+    
+    - name: Install Helm Binary
+      copy:
+        src: "{{ tmp_dir.path }}/{{ helm_arch }}/helm"
+        dest: "/usr/bin/helm"
+        mode: '0755'
+        remote_src: yes
+    
+    # check for correctness
+    - name: Verify Helm installation
+      command: helm version
+      register: helm_version_output
+      changed_when: false
+
+    - name: Show installed Helm version
+      debug:
+        var: helm_version_output.stdout
