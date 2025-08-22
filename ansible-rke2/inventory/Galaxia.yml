@@ -43,6 +43,8 @@ all:
 
   vars:
     netmask: 24
+    storage_node: worker1
+    storage_node_ip: 192.168.0.101
 
 ClusterGroup:
   children:

@@ -6,9 +6,24 @@ rke_ports:
     protocol: tcp 
   - port: 53
     protocol: udp
-  - port: 9345
-    protocol: tcp
-  - port: 6443
-    protocol: tcp
-  - port: 10250
-    protocol: tcp
+  - port: 9345    # RKE2 supervisor
+    protocol: tcp 
+  - port: 6443    # Kube API
+    protocol: tcp 
+  - port: 10250   # Kubelet
+    protocol: tcp 
+  - port: 8472    # Flannel VXLAN
+    protocol: udp  
+  - port: 2379    # etcd (control plane only)
+    protocol: tcp     
+
+# Storage + Samba settings
+nextcloud_namespace: nextcloud
+
+# The node that owns the USB/external hard drive
+storage_host_path: /mnt/windows/share/
+next_cloud_storage_path: "{{ storage_host_path }}/nextcloud-data"
+
+# SMB user bootstrap (optional)
+smb_user: eriq
+smb_pass: "changeme"   # leave empty ("") if you want to skip

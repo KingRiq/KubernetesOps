@@ -1,0 +1,74 @@
+--- 
+- name: Render one manifest containing NFS, PV/PVC, Samba
+  ansible.builtin.template:
+    src: storage.yaml.j2
+    dest: /tmp/storage.yaml
+    mode: "0644"
+
+
+# this is pretty cool you can use ansible to load a template as a variable "string"
+- name: Render manifest locally (string var)
+  ansible.builtin.set_fact:
+    rendered_manifest: "{{ lookup('template', 'storage.yaml.j2') }}"
+
+# rthen just copy the contents as text into a manifest directly... or you can just used template 
+
+- name: Copy manifest to control-plane
+  ansible.builtin.copy:
+    content: "{{ rendered_manifest }}"
+    dest: "{{ manifest_remote_path }}"
+    mode: "0644"
+  delegate_to: control-plane
+
+# this does the same thing as above but will copy everything to every string since i pass in cluster group
+# - name: Copy template to host
+#   template:
+#     src: storage.yaml.j2
+#     dest: "{{ manifest_remote_path }}"
+
+- include_role: 
+    name: firewall
+  vars:
+    firewall_ports: "{{ nfs_ports }}"
+
+- name: Ensure NFS export directories exist
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0775') }}"
+  loop:
+    - { path: "{{ storage_host_path }}", mode: "0777" }
+    - { path: "{{ next_cloud_storage_path }}", mode: "0755" }
+  when: inventory_hostname == storage_node
+
+- name: Create local share directory
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "{{ item.mode | default('0775') }}"
+  loop:
+    - { path: "/home/rocky9/share", mode: "0777" }
+  when: inventory_hostname != storage_node
+
+- name: Apply manifest on control-plane
+  become: yes
+  command: >
+    /var/lib/rancher/rke2/bin/kubectl apply -f {{ manifest_remote_path }}
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  delegate_to: control-plane
+
+
+- name: Mount NFS root export from "{{ storage_node }}"
+  mount:
+    path: "/home/{{ ansible_user }}/share"        # local mount point on the client VM
+    src: "{{ hostvars[storage_node].external_address.ip }}:/"
+    fstype: nfs4
+    opts: vers=4.2,rw,sync
+    state: mounted
+  when: inventory_hostname != storage_node
+

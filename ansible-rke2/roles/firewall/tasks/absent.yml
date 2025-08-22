@@ -1,0 +1,8 @@
+- name: Close all open ports
+  firewalld:
+    zone: public
+    port: "{{ item.port }}/{{ item.protocol }}" 
+    permanent: true
+    immediate: yes
+    state: disabled
+  loop: "{{ firewall_ports }}"

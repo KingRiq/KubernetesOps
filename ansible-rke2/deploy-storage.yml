@@ -1,0 +1,7 @@
+- import_playbook: evaluate_ip.yml
+- name: deploy NFS PV/PVC
+  hosts: ClusterGroup
+  become: yes
+  gather_facts: no
+  roles:
+    - nfs_pod

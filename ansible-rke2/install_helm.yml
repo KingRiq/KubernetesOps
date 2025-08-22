@@ -10,7 +10,7 @@
     helm_base_url: "https://get.helm.sh"
 
   tasks:
-    - name: Ensure requireed packages are presnet (Rocky9)
+    - name: Ensure required packages are presnet (Rocky9)
       dnf:
         name:
           - curl

@@ -15,13 +15,10 @@
     name: NetworkManager
     state: restarted
 
-- name: Open required ports
-  firewalld:
-    port: "{{ item.port }}/{{ item.protocol }}"    
-    permanent: yes
-    state: enabled
-    immediate: yes
-  loop: "{{ rke_ports }}"
+- include_role: 
+    name: firewall
+  vars:
+    firewall_ports: "{{ rke_ports }}"
 
 - name: Download and install RKE2
   shell: |
