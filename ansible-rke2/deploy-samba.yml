@@ -1,0 +1,4 @@
+- import_playbook: evaluate_ip.yml
+- name: Deploy Samba to a single node
+  hosts: ClusterGroup
+  

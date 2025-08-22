@@ -1,0 +1,10 @@
+storage_node_ip: "{{ hostvars[storage_node].external_address.ip }}"
+manifest_remote_path: "/tmp/storage.yaml"
+
+nfs_ports:
+  - port: 2049  # NFSv4
+    protocol: tcp  
+  - port: 2049  # NFSv4
+    protocol: udp  
+  - port: 445   # SMB
+    protocol: tcp  

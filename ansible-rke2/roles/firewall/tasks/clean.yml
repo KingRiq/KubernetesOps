@@ -1,0 +1,13 @@
+- name: List currently open ports
+  command: firewall-cmd --list-ports
+  register: open_ports
+  changed_when: false
+
+- name: Close all open ports
+  firewalld:
+    zone: public
+    port: "{{ item }}"
+    permanent: true
+    state: disabled
+  loop: "{{ open_ports.stdout | split(' ') }}"
+  when: open_ports.stdout_lines | length > 0

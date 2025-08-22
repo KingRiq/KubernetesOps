@@ -1,0 +1,6 @@
+---
+- include_tasks: create_nfs_pod.yml
+  when: state == 'present'
+
+# - include_tasks: uninstall_rke2.yml
+#   when: state == 'absent'
