@@ -1,0 +1,95 @@
+# Only every deploying metallb I don't see a usecase for removing it so no need for absent and present roles just do nothing when absent
+
+---
+- name: Ensure MetalLB namespace
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    context: default
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ metallb_namespace }}"
+
+- name: Ensure files directory exists on localhost
+  file:
+    path: "{{ playbook_dir }}/files"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+
+- name: Download MetalLB manifest
+  get_url:
+    url: "https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml"
+    dest: "{{ playbook_dir }}/files/metallb-native.yaml"
+    mode: '0644'
+  delegate_to: localhost
+
+- name: Copy MetalLB manifest from repo to control-plane
+  copy:
+    src: "{{ playbook_dir }}/files/metallb-native.yaml"
+    dest: /tmp/metallb-native.yaml
+  delegate_to: control-plane
+
+- name: Apply MetalLB manifest
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    src: "/tmp/metallb-native.yaml"
+
+- name: Wait for MetalLB controller pods to be ready
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    namespace: "{{ metallb_namespace }}"
+    kind: Pod
+    label_selectors:
+      - "app=metallb"
+      - "component=controller"
+  register: metallb_pods
+  until: metallb_pods.resources | length > 0 and
+         (metallb_pods.resources |
+          map(attribute='status.containerStatuses') | flatten |
+          map(attribute='ready') | select('equalto', true) | list | length) > 0
+  retries: 20
+  delay: 15
+
+- name: Wait for MetalLB webhook service to have endpoints
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    namespace: "{{ metallb_namespace }}"
+    kind: Endpoints
+    name: metallb-webhook-service
+  register: webhook_ep
+  until: webhook_ep.resources | length > 0 and
+         webhook_ep.resources[0].subsets is defined and
+         webhook_ep.resources[0].subsets | length > 0
+  retries: 20
+  delay: 10
+
+- name: Manage MetalLB IP address pool
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    context: default
+    state: present
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: IPAddressPool
+      metadata:
+        name: default-address-pool
+        namespace: "{{ metallb_namespace }}"
+      spec:
+        addresses:
+          - "{{ metallb_ip_range }}"
+
+- name: Manage MetalLB advertisement
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    context: default
+    state: present
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: L2Advertisement
+      metadata:
+        name: default-advertisement
+        namespace: "{{ metallb_namespace }}"

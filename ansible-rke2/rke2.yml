@@ -1,20 +1,28 @@
 ---
 
+- name: Bootstrap control node
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: bootstrap_collections
+      when: state == 'present'
+    
 - import_playbook: evaluate_ip.yml
-- name: Preconfigure RKE2 nodes 
+  tags:
+    - active
+
+- name: "{{ state }}ing RKE2 nodes "
   hosts: ClusterGroup
   become: true
   roles:
-    - rke2
+    - role: rke2
 
-# - name: Setup RKE2 control plane
-#   hosts: control
-#   become: true
-#   roles:
-#     - control
 
-# - name: Setup RKE2 workers
-#   hosts: workers
-#   become: true
-#   roles:
-#     - workers
+- name: Deploy MetalLB 
+  hosts: control
+  become: true
+  roles:
+    - role: metallb
+      when: state == 'present'
+      tags:
+        - metallb

@@ -1,17 +1,16 @@
---- 
+---
 - name: Render one manifest containing NFS, PV/PVC, Samba
   ansible.builtin.template:
     src: storage.yaml.j2
     dest: /tmp/storage.yaml
     mode: "0644"
 
-
 # this is pretty cool you can use ansible to load a template as a variable "string"
 - name: Render manifest locally (string var)
   ansible.builtin.set_fact:
     rendered_manifest: "{{ lookup('template', 'storage.yaml.j2') }}"
 
-# rthen just copy the contents as text into a manifest directly... or you can just used template 
+# rthen just copy the contents as text into a manifest directly... or you can just used template
 
 - name: Copy manifest to control-plane
   ansible.builtin.copy:
@@ -26,10 +25,22 @@
 #     src: storage.yaml.j2
 #     dest: "{{ manifest_remote_path }}"
 
-- include_role: 
+- include_role:
     name: firewall
   vars:
     firewall_ports: "{{ nfs_ports }}"
+
+- name: Ensure NFS utilities are installed (client + server on storage node)
+  package:
+    name: nfs-utils
+    state: present
+  become: true
+
+- name: Install CIFS utils
+  package:
+    name: cifs-utils
+    state: present
+  become: true
 
 - name: Ensure NFS export directories exist
   file:
@@ -43,16 +54,13 @@
     - { path: "{{ next_cloud_storage_path }}", mode: "0755" }
   when: inventory_hostname == storage_node
 
-- name: Create local share directory
-  file:
-    path: "{{ item.path }}"
-    state: directory
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: "{{ item.mode | default('0775') }}"
-  loop:
-    - { path: "/home/rocky9/share", mode: "0777" }
-  when: inventory_hostname != storage_node
+- name: Remove old samba deployment if exists
+  become: yes
+  command: >
+    /var/lib/rancher/rke2/bin/kubectl -n {{ nextcloud_namespace }} delete deployment samba --ignore-not-found
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  delegate_to: control-plane
 
 - name: Apply manifest on control-plane
   become: yes
@@ -61,14 +69,47 @@
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
   delegate_to: control-plane
+  when: inventory_hostname in groups['control']
 
-
-- name: Mount NFS root export from "{{ storage_node }}"
+- name: Unmount anything currently mounted at /share (graceful)
   mount:
-    path: "/home/{{ ansible_user }}/share"        # local mount point on the client VM
-    src: "{{ hostvars[storage_node].external_address.ip }}:/"
-    fstype: nfs4
-    opts: vers=4.2,rw,sync
+    path: /share
+    state: unmounted
+  ignore_errors: true
+
+- name: Create local share directory
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "{{ item.mode | default('0775') }}"
+  loop:
+    - { path: "{{ share_path }}", mode: "0777" }
+  when: inventory_hostname != storage_node
+  ignore_errors: true
+
+- name: Write SMB credentials (0600)
+  copy:
+    dest: /etc/samba/cred-{{ samba_assigned_ip }}
+    mode: "0600"
+    content: |
+      username=galaxia
+      password=galaxia
+
+- name: Wait for TCP/445 on {{ samba_assigned_ip }} (from target node)
+  shell: "nc -z -w2 {{ samba_assigned_ip }} 445"
+  register: nc_check
+  retries: 30
+  delay: 2
+  until: nc_check.rc == 0
+  changed_when: false
+
+- name: Mount CIFS samba exports from "{{ storage_node }}"
+  mount:
+    path: /share
+    src: "//{{ samba_assigned_ip }}/CloudData"
+    fstype: cifs
+    opts: "username=galaxia,password=galaxia,vers=3.1.1,sec=ntlmssp,uid=1000,gid=1000,file_mode=0664,dir_mode=0775,noperm,_netdev"
     state: mounted
   when: inventory_hostname != storage_node
-

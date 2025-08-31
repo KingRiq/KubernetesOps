@@ -1,0 +1,10 @@
+---
+# tasks file for roles/bootstrap_collections
+- name: Check if any Ansible Galaxy collections are installed
+  stat:
+     path: "{{ playbook_dir }}/collections/ansible_collections"
+  register: collections_dir
+
+- name: Install required collections
+  command: ansible-galaxy collection install -r requirements.yml
+  when: not collections_dir.stat.exists

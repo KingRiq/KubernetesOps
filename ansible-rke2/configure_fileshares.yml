@@ -1,5 +1,4 @@
 ---
-
 #Mount a file share from a host machine (I don't have a current usecase for this yet. Going to try the nextcloud solutation and see how that works out before I proceed with this approach)
 - import_playbook: evaluate_ip.yml
 - name: Mount SMB share on Linux nodes
@@ -21,20 +20,23 @@
         state: directory
         owner: root
         group: root
-        mode: '0755'
+        mode: "0777"
+      when: inventory_hostname == storage_node
 
-    - name: Mount the SMB share
-      mount:
-        path: "{{ mount_point }}"
-        src: "{{ smb_share }}"
-        fstype: cifs
-        opts: "username={{ smb_username }},password={{ smb_password }},domain={{ smb_domain }},vers={{ smb_version }},rw"
-        state: mounted
+    - name: Ensure mount points exist
+      file:
+        path: "{{ mount_point }}/{{ item.mount_name }}"
+        state: directory
+        mode: "0777"
+      loop: "{{ smb_domains }}"
+      when: inventory_hostname == storage_node
 
-    - name: Ensure the SMB share is mounted on boot (fstab)
+    - name: Mount SMB shares
       mount:
-        path: "{{ mount_point }}"
-        src: "{{ smb_share }}"
+        path: "{{ mount_point }}/{{ item.mount_name }}"
+        src: "{{ item.smb_share }}"
         fstype: cifs
-        opts: "username={{ smb_username }},password={{ smb_password }},domain={{ smb_domain }},vers={{ smb_version }},rw"
-        state: present
+        opts: "username={{ smb_username }},password={{ smb_password }},domain={{ item.domain }},vers={{ smb_version }},rw,uid=65534,gid=65534,file_mode=0777,dir_mode=0777,noperm"
+        state: "{{ state }}"
+      loop: "{{ smb_domains }}"
+      when: inventory_hostname == storage_node

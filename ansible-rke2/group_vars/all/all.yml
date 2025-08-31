@@ -1,5 +1,6 @@
 ansible_become_pass: "{{ ansible_ssh_pass }}"
 ansible_user: rocky9
+kubeconfig: /etc/rancher/rke2/rke2.yaml
   
 rke_ports:
   - port: 53
@@ -15,7 +16,17 @@ rke_ports:
   - port: 8472    # Flannel VXLAN
     protocol: udp  
   - port: 2379    # etcd (control plane only)
-    protocol: tcp     
+    protocol: tcp   
+  - port: 2380    # desc: "etcd peer" }
+    protocol: tcp 
+  - port: 10256   # desc: "kube-proxy health check" }
+    protocol: tcp 
+  - port: 53      # dsc: "DNS (CoreDNS)" }  
+    protocol: udp 
+  - port: 53      # desc: "DNS (CoreDNS)" }
+    protocol: tcp 
+
+
 
 # Storage + Samba settings
 nextcloud_namespace: nextcloud

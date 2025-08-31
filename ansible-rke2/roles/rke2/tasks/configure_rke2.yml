@@ -27,6 +27,13 @@
     line: 'export PATH=$PATH:/var/lib/rancher/rke2/bin'
     create: yes
 
+- name: Add KUBECONFIG to root's .bashrc
+  lineinfile:
+    path: /root/.bashrc
+    regexp: '^export KUBECONFIG='
+    line: 'export KUBECONFIG=/etc/rancher/rke2/rke2.yaml'
+    create: yes
+
 - name: Wait for RKE2 internal API to become reachable (port 9345)
   wait_for:
     host: "{{ ansible_host }}"
