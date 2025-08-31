@@ -1,4 +1,5 @@
-- hosts: ClusterGroup
+- name: Evaluating IP of hosts
+  hosts: ClusterGroup
   gather_facts: no
   vars:
     external_ip: "{{ hostvars[inventory_hostname].external_address.ip }}"

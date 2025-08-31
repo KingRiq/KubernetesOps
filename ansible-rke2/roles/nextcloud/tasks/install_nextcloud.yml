@@ -17,14 +17,86 @@
   register: ns_create
   failed_when: ns_create.rc != 0 and 'AlreadyExists' not in ns_create.stderr
 
-- name: Install Nextcloud via Helm
-  command: >
-    helm install nextcloud nextcloud/nextcloud
-    --namespace nextcloud
-    -f /tmp/nextcloud-values.yaml
+- name: Scale down Nextcloud deployment to 0 replicas
+  kubernetes.core.k8s_scale:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: nextcloud
+    name: nextcloud
+    replicas: 0
+    kubeconfig: /etc/rancher/rke2/rke2.yaml
+  ignore_errors: yes
+
+- name: Ensure old PV is absent if spec changes
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  kubernetes.core.k8s:
+    state: absent
+    kind: PersistentVolume
+    namespace: nextcloud
+    name: nextcloud-nfs-pv
+  when: delete_volumes | default(false) | bool
 
+- name: Ensure old PVC is absent if spec changes
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  kubernetes.core.k8s:
+    state: absent
+    kind: PersistentVolumeClaim
+    namespace: nextcloud
+    name: nextcloud-data
+  when: delete_volumes | default(false) | bool
+
+- name: Ensure local PV exists for Nextcloud
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: PersistentVolume
+      metadata:
+        name: nextcloud-nfs-pv
+      spec:
+        capacity:
+          storage: 2Ti
+        accessModes:
+          - ReadWriteMany
+        persistentVolumeReclaimPolicy: Retain
+        storageClassName: ""
+        nfs:
+          server: "{{ storage_node_ip }}" # node IP where NFS pod runs (hostNetwork)
+          path: "/nextcloud-data"
+          mountOptions:
+            - nfsvers=4.2
+        # hostPath:
+        #   path: /srv/nextcloud-local/   # must exist on worker1
+
+- name: Ensure PVC exists for Nextcloud
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: nextcloud-data
+        namespace: nextcloud
+      spec:
+        accessModes:
+          - ReadWriteMany
+        resources:
+          requests:
+            storage: 2Ti
+        storageClassName: "" # bind to the static PV
+        volumeName: nextcloud-nfs-pv
+
+- name: Deploy Nextcloud with Helm
+  command: >
+    helm upgrade --install nextcloud nextcloud/nextcloud --namespace nextcloud -f /tmp/nextcloud-values.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
 
 - name: Wait for Nextcloud pod to be ready
   command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=nextcloud -n nextcloud --timeout=300s

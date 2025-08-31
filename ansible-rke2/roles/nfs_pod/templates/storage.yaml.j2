@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   name: {{ nextcloud_namespace }}
 ---
-# NFS server pod (exports your external drive to the cluster)
+# NFS server pod (exports {{ nfs_export_path }} to the cluster, backed by {{ storage_host_path }} on the node)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,17 +30,42 @@ spec:
             privileged: true
           env:
             - name: SHARED_DIRECTORY
-              value: "/exports"
+              value: "{{ nfs_export_path }}"         # path exported by the NFS container
+            - name: EXPORT_OPTIONS
+              value: "rw,fsid=0,async,no_subtree_check,insecure,no_root_squash,crossmnt"
+          ports:
+            - containerPort: 2049
+              name: nfs
+              protocol: TCP
+          readinessProbe:
+            tcpSocket: { port: 2049 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
           volumeMounts:
             - name: nfs-data
-              mountPath: /exports                  # THIS WILL LIVE IN THE POD it is mapped to storage_host_path
-      volumes: 
+              mountPath: "{{ nfs_export_path }}"      # mount hostPath here inside the container
+              mountPropagation: HostToContainer
+            - name: nfs-crystal
+              mountPath: /exports/Crystal_Tokyo
+              mountPropagation: HostToContainer
+            - name: nfs-luna
+              mountPath: /exports/Silver_Millenium
+              mountPropagation: HostToContainer
+      volumes:
         - name: nfs-data
           hostPath:
-            path: "{{ storage_host_path }}"        # Mount this directory into the pod
+            path: "{{ storage_host_path }}"           # directory on the node
             type: DirectoryOrCreate
+        - name: nfs-crystal
+          hostPath:
+            path: /mnt/windows/share/Crystal_Tokyo   # CIFS mountpoint on worker1
+            type: Directory
+        - name: nfs-luna
+          hostPath:
+            path: /mnt/windows/share/Silver_Millenium
+            type: Directory
 ---
-# PV/PVC for Nextcloud (RWX to the NFS export)
+# Static PV/PVC for Nextcloud (RWX to the NFS export)
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -50,9 +75,10 @@ spec:
     storage: 2Ti
   accessModes: ["ReadWriteMany"]
   persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""                                # avoid default StorageClass
   nfs:
-    server: {{ storage_node_ip }}
-    path: /exports                                # points to storage location on the pod that is managed by kubernetes (only useful for other pods)
+    server: {{ storage_node_ip }}                     # node IP where NFS pod runs (hostNetwork)
+    path: "/nextcloud-data"                    # MUST match NFS export path
   mountOptions:
     - nfsvers=4.2
 ---
@@ -66,9 +92,10 @@ spec:
   resources:
     requests:
       storage: 2Ti
+  storageClassName: ""                                # bind to the static PV
   volumeName: nextcloud-nfs-pv
 ---
-# Samba: re-exports the same storage over SMB for Windows/macOS
+# Samba config (exports /data/share from inside the container)
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -77,22 +104,27 @@ metadata:
 data:
   smb.conf: |
     [global]
-      workgroup = WORKGROUP
-      server string = Samba in RKE2
+      server role = standalone server
       security = user
-      map to guest = Bad User
-      smb encrypt = desired
+      map to guest = Bad Password
+      guest account = nobody
+      server min protocol = SMB2
+      client min protocol = SMB2
+      ntlm auth = yes
       log file = /var/log/samba/log.%m
       max log size = 1000
 
-    [NextcloudData]
+    [CloudData]
       path = /data/share
       browseable = yes
-      writable = yes
-      guest ok = no
-      create mask = 0664
-      directory mask = 0775
+      read only = no
+      valid users = galaxia
+      guest ok = yes
+      public = yes
+      guest only = yes
+
 ---
+# Samba pod mounting the same NFS export; exposed via MetalLB
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -108,28 +140,113 @@ spec:
       labels:
         app: samba
     spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirst                            # no hostNetwork when using a Service
       nodeSelector:
         kubernetes.io/hostname: {{ storage_node }}
+      # initContainers:
+      #   - name: mount-artemis
+      #     image: alpine:latest
+      #     securityContext:
+      #       privileged: true
+      #     command:
+      #       - sh
+      #       - -c
+      #       - |
+      #         apk add --no-cache cifs-utils
+      #         mkdir -p /data/Crystal_Tokyo
+      #         mount -t cifs //ARTEMIS/CloudData /data/Crystal_Tokyo \
+      #           -o username={{ smb_username }},password={{ smb_password }},vers=3.1.1,uid=0,gid=0
+      #     volumeMounts:
+      #       - name: data
+      #         mountPath: /data
+      #         mountPropagation: HostToContainer
+
+      #   - name: mount-luna
+      #     image: alpine:latest
+      #     securityContext:
+      #       privileged: true
+      #     command:
+      #       - sh
+      #       - -c
+      #       - |
+      #         apk add --no-cache cifs-utils
+      #         mkdir -p /data/Silver_Millenium
+      #         mount -t cifs //LUNA/CloudData /data/Silver_Millenium \
+      #           -o username={{ smb_username }},password={{ smb_password }},vers=3.1.1,uid=0,gid=0
+      #     volumeMounts:
+      #       - name: data
+      #         mountPath: /data
+      #         mountPropagation: HostToContainer
       containers:
         - name: samba
-          image: crazymax/samba:latest
-          securityContext:
-            runAsUser: 0
+          image: dperson/samba:latest
+          args:
+            - "-u"
+            - "galaxia;galaxia"
+            - "-s"
+            - "CloudData;/data/share;yes;no;yes;all"
+          securityContext: 
+            privileged: true   # needed if using mountPropagation
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "smbcontrol all shutdown"]
           env:
             - name: SAMBA_LOG_LEVEL
               value: "1"
+          ports:
+            - containerPort: 445
+              name: smb
+              protocol: TCP
+          readinessProbe:
+            tcpSocket: { port: 445 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
           volumeMounts:
             - name: smb-conf
               mountPath: /etc/samba
             - name: data
-              mountPath: /data/share
+              mountPath: /data/share                # Samba shares this path
+              mountPropagation: HostToContainer
+            # - name: nextcloud-nfs
+            #   mountPath: /data/nextcloud
+            - name: artemis-host
+              mountPath: /data/share/Crystal_Tokyo
+              mountPropagation: HostToContainer
+            - name: luna-host
+              mountPath: /data/share/Silver_Millenium
+              mountPropagation: HostToContainer
       volumes:
         - name: smb-conf
-          configMap:
-            name: samba-config
+          configMap: { name: samba-config }
         - name: data
           nfs:
-            server: {{ storage_node_ip }}
-            path: /exports
+            server: {{ storage_node_ip }}            # same node IP as PV
+            path: "/"          # MUST match NFS export path
+        # - name: nextcloud-nfs         # <-- add this
+        #   persistentVolumeClaim:    
+        #     claimName: nextcloud-data # bind to your PVC
+        - name: artemis-host
+          hostPath:
+            path: /mnt/windows/share/Crystal_Tokyo
+            type: Directory
+        - name: luna-host
+          hostPath:
+            path: /mnt/windows/share/Silver_Millenium
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: samba-lb
+  namespace: {{ nextcloud_namespace }}
+spec:
+  type: LoadBalancer                                   # MetalLB assigns an EXTERNAL-IP
+  loadBalancerIP: {{ samba_assigned_ip }}
+  selector:
+    app: samba
+  ports:
+    - name: smb
+      port: 445
+      targetPort: 445
+      protocol: TCP

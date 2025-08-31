@@ -10,6 +10,29 @@
     group: root
     mode: '0644'
 
+- name: Ensure Python3 and pip installed (Rocky/RedHat)
+  ansible.builtin.package:
+    name:
+      - python3
+      - python3-pip
+    state: present
+  become: true
+
+- name: Ensure setuptools and wheel via pip
+  ansible.builtin.pip:
+    name:
+      - setuptools
+      - wheel
+    executable: pip3
+  become: true
+
+- name: Install Kubernetes Python client
+  ansible.builtin.pip:
+    name: kubernetes
+    executable: pip3
+  become: true
+
+
 - name: Restart NetworkManager
   service:
     name: NetworkManager
@@ -19,6 +42,31 @@
     name: firewall
   vars:
     firewall_ports: "{{ rke_ports }}"
+
+- name: Trust CNI interfaces
+  ansible.posix.firewalld:
+    zone: trusted
+    interface: "{{ item }}"
+    permanent: true
+    state: enabled
+  loop:
+    - cni0
+    - flannel.1
+    - kube-ipvs0
+  ignore_errors: true
+
+- name: Trust Pod/Service CIDRs
+  ansible.posix.firewalld:
+    zone: trusted
+    source: "{{ item }}"
+    permanent: true
+    state: enabled
+  loop:
+    - 10.42.0.0/16   # Pods 
+    - 10.43.0.0/16   # Services 
+
+- name: Reload firewalld
+  ansible.builtin.command: firewall-cmd --reload
 
 - name: Download and install RKE2
   shell: |

@@ -1,7 +1,7 @@
 mariadb:
-  enabled: false  
+  enabled: false
 nextcloud:
-  host: 192.168.0.100          
+  host: 192.168.0.222         
   username: admin
   password: changeme
   trustedDomains:             
@@ -9,26 +9,49 @@ nextcloud:
     - 192.168.0.101
     - 192.168.0.102
     - 192.168.0.103
+    - 192.168.0.222
     - nextcloud.default.svc
     - nextcloud.default.svc.cluster.local
+  podSecurityContext:
+    fsGroup: 0
+    runAsUser: 0
+    runAsGroup: 33
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 10
 
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 10
+startupProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 10
 persistence:
-  enabled: false
-#   storageClass: ""             # empty = cluster default
-#   accessMode: ReadWriteOnce
-#   size: 8Gi
-
+  enabled: true
+  existingClaim: nextcloud-data
+  accessMode: ReadWriteMany
+  size: 2Ti
+  storageClass: ""                
+ 
 service:
-  type: NodePort
-  port: 80                     
-  nodePort: 30080
+  type: LoadBalancer
+  loadBalancerIP: 192.168.0.222
+  port: 80
+  targetPort: 80
+
 
 ingress:
   enabled: false
 
-# securityContext:
-#   enabled: true
-#   runAsUser: 33
-#   runAsGroup: 33
-#   fsGroup: 33
-#   fsGroupChangePolicy: "OnRootMismatch"
+# force Nextcloud to always run on worker1
+nodeSelector:
+  kubernetes.io/hostname: worker1

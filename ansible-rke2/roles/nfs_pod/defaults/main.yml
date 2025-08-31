@@ -1,10 +1,12 @@
 storage_node_ip: "{{ hostvars[storage_node].external_address.ip }}"
 manifest_remote_path: "/tmp/storage.yaml"
-
+samba_assigned_ip: 102.168.0.235
+share_path: /share
+nfs_export_path: /exports
 nfs_ports:
-  - port: 2049  # NFSv4
-    protocol: tcp  
-  - port: 2049  # NFSv4
-    protocol: udp  
-  - port: 445   # SMB
-    protocol: tcp  
+  - port: 2049 # NFSv4
+    protocol: tcp
+  - port: 2049 # NFSv4
+    protocol: udp
+  - port: 445 # SMB
+    protocol: tcp

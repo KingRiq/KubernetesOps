@@ -1,0 +1,2 @@
+metallb_namespace: metallb-system
+metallb_ip_range: "192.168.0.201-192.168.0.254"

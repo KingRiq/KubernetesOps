@@ -1,7 +1,7 @@
 all:
   hosts:
     control-plane:
-      ansible_host: 59.22.6.129
+      ansible_host: 59.22.6.133
       internal_address:
         ip: 59.22.60.100
         gateway: 59.22.0.1
@@ -45,6 +45,7 @@ all:
     netmask: 24
     storage_node: worker1
     storage_node_ip: 192.168.0.101
+    samba_assigned_ip: 192.168.0.235
 
 ClusterGroup:
   children:
