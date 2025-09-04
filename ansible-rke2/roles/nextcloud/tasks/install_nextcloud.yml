@@ -34,7 +34,7 @@
     state: absent
     kind: PersistentVolume
     namespace: nextcloud
-    name: nextcloud-nfs-pv
+    name: nextcloud-mariadb-pv
   when: delete_volumes | default(false) | bool
 
 - name: Ensure old PVC is absent if spec changes
@@ -44,10 +44,10 @@
     state: absent
     kind: PersistentVolumeClaim
     namespace: nextcloud
-    name: nextcloud-data
+    name: nextcloud-mariadb-pvc
   when: delete_volumes | default(false) | bool
 
-- name: Ensure local PV exists for Nextcloud
+- name: Ensure local PV exists for MariaDB separately
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
   kubernetes.core.k8s:
@@ -56,23 +56,21 @@
       apiVersion: v1
       kind: PersistentVolume
       metadata:
-        name: nextcloud-nfs-pv
+        name: nextcloud-mariadb-pv
       spec:
         capacity:
           storage: 2Ti
         accessModes:
-          - ReadWriteMany
+          - ReadWriteOnce
         persistentVolumeReclaimPolicy: Retain
         storageClassName: ""
         nfs:
-          server: "{{ storage_node_ip }}" # node IP where NFS pod runs (hostNetwork)
-          path: "/nextcloud-data"
+          server: "{{ storage_node_ip }}"
+          path: "/nextcloud-mariadb"   # <- make a dedicated dir for MariaDB
           mountOptions:
             - nfsvers=4.2
-        # hostPath:
-        #   path: /srv/nextcloud-local/   # must exist on worker1
 
-- name: Ensure PVC exists for Nextcloud
+- name: Ensure PVC exists for MariaDB
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
   kubernetes.core.k8s:
@@ -81,16 +79,16 @@
       apiVersion: v1
       kind: PersistentVolumeClaim
       metadata:
-        name: nextcloud-data
+        name: nextcloud-mariadb-pvc
         namespace: nextcloud
       spec:
         accessModes:
-          - ReadWriteMany
+          - ReadWriteOnce
         resources:
           requests:
             storage: 2Ti
         storageClassName: "" # bind to the static PV
-        volumeName: nextcloud-nfs-pv
+        volumeName: nextcloud-mariadb-pv   # <- corrected reference
 
 - name: Deploy Nextcloud with Helm
   command: >

@@ -5,7 +5,7 @@
   hosts: all
   become: yes
   vars:
-    smb_version: "3.1.1"
+    smb_version: "3.0"
     fstype: "cifs"
 
   tasks:
@@ -36,7 +36,7 @@
         path: "{{ mount_point }}/{{ item.mount_name }}"
         src: "{{ item.smb_share }}"
         fstype: cifs
-        opts: "username={{ smb_username }},password={{ smb_password }},domain={{ item.domain }},vers={{ smb_version }},rw,uid=65534,gid=65534,file_mode=0777,dir_mode=0777,noperm"
+        opts: "username={{ item.smb_username }},password={{ item.smb_password }},domain={{ item.domain }},vers={{ smb_version }},rw,uid=65534,gid=65534,file_mode=0777,dir_mode=0777,noperm"
         state: "{{ state }}"
       loop: "{{ smb_domains }}"
       when: inventory_hostname == storage_node
