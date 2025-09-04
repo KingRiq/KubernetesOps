@@ -48,8 +48,14 @@ spec:
             - name: nfs-crystal
               mountPath: /exports/Crystal_Tokyo
               mountPropagation: HostToContainer
-            - name: nfs-luna
+            - name: nfs-silver
               mountPath: /exports/Silver_Millenium
+              mountPropagation: HostToContainer
+            - name: nfs-shadow
+              mountPath: /exports/Shadow_Galactica
+              mountPropagation: HostToContainer
+            - name: nfs-mariadb
+              mountPath: /exports/nextcloud-mariadb
               mountPropagation: HostToContainer
       volumes:
         - name: nfs-data
@@ -59,11 +65,19 @@ spec:
         - name: nfs-crystal
           hostPath:
             path: /mnt/windows/share/Crystal_Tokyo   # CIFS mountpoint on worker1
-            type: Directory
-        - name: nfs-luna
+            type: DirectoryOrCreate
+        - name: nfs-silver
           hostPath:
             path: /mnt/windows/share/Silver_Millenium
-            type: Directory
+            type: DirectoryOrCreate
+        - name: nfs-shadow
+          hostPath:
+            path: /mnt/windows/share/Shadow_Galactica
+            type: DirectoryOrCreate
+        - name: nfs-mariadb
+          hostPath:
+            path: /mnt/windows/share/nextcloud-mariadb
+            type: DirectoryOrCreate
 ---
 # Static PV/PVC for Nextcloud (RWX to the NFS export)
 apiVersion: v1
@@ -143,40 +157,6 @@ spec:
       dnsPolicy: ClusterFirst                            # no hostNetwork when using a Service
       nodeSelector:
         kubernetes.io/hostname: {{ storage_node }}
-      # initContainers:
-      #   - name: mount-artemis
-      #     image: alpine:latest
-      #     securityContext:
-      #       privileged: true
-      #     command:
-      #       - sh
-      #       - -c
-      #       - |
-      #         apk add --no-cache cifs-utils
-      #         mkdir -p /data/Crystal_Tokyo
-      #         mount -t cifs //ARTEMIS/CloudData /data/Crystal_Tokyo \
-      #           -o username={{ smb_username }},password={{ smb_password }},vers=3.1.1,uid=0,gid=0
-      #     volumeMounts:
-      #       - name: data
-      #         mountPath: /data
-      #         mountPropagation: HostToContainer
-
-      #   - name: mount-luna
-      #     image: alpine:latest
-      #     securityContext:
-      #       privileged: true
-      #     command:
-      #       - sh
-      #       - -c
-      #       - |
-      #         apk add --no-cache cifs-utils
-      #         mkdir -p /data/Silver_Millenium
-      #         mount -t cifs //LUNA/CloudData /data/Silver_Millenium \
-      #           -o username={{ smb_username }},password={{ smb_password }},vers=3.1.1,uid=0,gid=0
-      #     volumeMounts:
-      #       - name: data
-      #         mountPath: /data
-      #         mountPropagation: HostToContainer
       containers:
         - name: samba
           image: dperson/samba:latest
@@ -216,6 +196,12 @@ spec:
             - name: luna-host
               mountPath: /data/share/Silver_Millenium
               mountPropagation: HostToContainer
+            - name: mac-host
+              mountPath: /data/share/Shadow_Galactica
+              mountPropagation: HostToContainer
+            - name: mariadb
+              mountPath: /data/share/nextcloud-mariadb
+              mountPropagation: HostToContainer
       volumes:
         - name: smb-conf
           configMap: { name: samba-config }
@@ -233,6 +219,14 @@ spec:
         - name: luna-host
           hostPath:
             path: /mnt/windows/share/Silver_Millenium
+            type: Directory
+        - name: mac-host
+          hostPath:
+            path: /mnt/windows/share/Shadow_Galactica
+            type: Directory
+        - name: mariadb
+          hostPath:
+            path: /mnt/windows/share/nextcloud-mariadb
             type: Directory
 ---
 apiVersion: v1

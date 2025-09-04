@@ -1,5 +1,29 @@
 mariadb:
-  enabled: false
+  enabled: true
+  architecture: standalone
+
+  auth:
+    database: nextcloud
+    username: nextcloud
+    password: changeme        # 🔑 change this to a strong password
+
+  primary:
+    persistence:
+      enabled: true
+      existingClaim: nextcloud-mariadb-pvc   # <-- must match the PVC you created in Ansible
+      accessModes:
+        - ReadWriteOnce
+      size: 20Gi             # Helm chart still needs a size, but your PVC spec wins
+      storageClass: ""       # blank since we’re binding manually
+  containerSecurityContext:
+    runAsUser: 0
+    runAsGroup: 0
+    fsGroup: 0
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/mariadb
+    tag: 12.0.2-debian-12-r0
+
 nextcloud:
   host: 192.168.0.222         
   username: admin
@@ -10,12 +34,15 @@ nextcloud:
     - 192.168.0.102
     - 192.168.0.103
     - 192.168.0.222
+    - cloud.chaoscauldron.space
     - nextcloud.default.svc
     - nextcloud.default.svc.cluster.local
   podSecurityContext:
     fsGroup: 0
     runAsUser: 0
     runAsGroup: 33
+  redis:
+    enabled: true
 livenessProbe:
   enabled: true
   initialDelaySeconds: 120
@@ -55,3 +82,29 @@ ingress:
 # force Nextcloud to always run on worker1
 nodeSelector:
   kubernetes.io/hostname: worker1
+
+externalDatabase:
+  enabled: true
+  type: mysql
+  host: nextcloud-mariadb
+  user: nextcloud
+  password: changeme      # must match the Secret you set
+  database: nextcloud
+
+internalDatabase:
+  enabled: false
+
+redis:
+  enabled: true
+  architecture: standalone
+
+  auth:
+    enabled: false   # keep it simple at first; you can add a password later
+
+  master:
+    persistence:
+      enabled: false
+
+global:
+  security:
+    allowInsecureImages: true
