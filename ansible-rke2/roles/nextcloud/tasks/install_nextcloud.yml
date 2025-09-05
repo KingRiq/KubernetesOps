@@ -1,3 +1,12 @@
+- include_role:
+    name: kube_secrets
+  vars:
+    secret_namespace: nextcloud
+    secret_name: nextcloud-secrets
+    secret_data:
+      username: "admin"
+      password: "{{ nextcloud_password }}"
+
 - name: Add Nextcloud Helm repo
   command: helm repo add nextcloud https://nextcloud.github.io/helm/
 
@@ -66,7 +75,7 @@
         storageClassName: ""
         nfs:
           server: "{{ storage_node_ip }}"
-          path: "/nextcloud-mariadb"   # <- make a dedicated dir for MariaDB
+          path: "/nextcloud-mariadb" # <- make a dedicated dir for MariaDB
           mountOptions:
             - nfsvers=4.2
 
@@ -88,7 +97,7 @@
           requests:
             storage: 2Ti
         storageClassName: "" # bind to the static PV
-        volumeName: nextcloud-mariadb-pv   # <- corrected reference
+        volumeName: nextcloud-mariadb-pv # <- corrected reference
 
 - name: Deploy Nextcloud with Helm
   command: >
