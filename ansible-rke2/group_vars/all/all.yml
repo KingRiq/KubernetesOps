@@ -1,6 +1,8 @@
 ansible_become_pass: "{{ ansible_ssh_pass }}"
 ansible_user: rocky9
 kubeconfig: /etc/rancher/rke2/rke2.yaml
+kube_env:
+  KUBECONFIG: /etc/rancher/rke2/rke2.yaml
   
 rke_ports:
   - port: 53

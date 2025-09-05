@@ -1,0 +1,9 @@
+---
+- include_tasks: present.yml
+  when: state == 'present'
+
+- include_tasks: absent.yml
+  when: state == 'absent'
+
+- include_tasks: clean.yml
+  when: state is undefined

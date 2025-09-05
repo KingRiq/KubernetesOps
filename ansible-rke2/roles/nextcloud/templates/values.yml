@@ -26,8 +26,12 @@ mariadb:
 
 nextcloud:
   host: 192.168.0.222         
-  username: admin
-  password: changeme
+  existingSecret:
+    enabled: true
+    secretName: nextcloud-secrets
+    usernameKey: username
+    passwordKey: password
+
   trustedDomains:             
     - 192.168.0.100
     - 192.168.0.101
