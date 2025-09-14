@@ -3,9 +3,9 @@ mariadb:
   architecture: standalone
 
   auth:
-    database: nextcloud
+    existingSecret: nextcloud-secrets
     username: nextcloud
-    password: changeme        # 🔑 change this to a strong password
+    database: nextcloud
 
   primary:
     persistence:
@@ -79,7 +79,6 @@ service:
   port: 80
   targetPort: 80
 
-
 ingress:
   enabled: false
 
@@ -92,8 +91,12 @@ externalDatabase:
   type: mysql
   host: nextcloud-mariadb
   user: nextcloud
-  password: changeme      # must match the Secret you set
   database: nextcloud
+  existingSecret:
+    enabled: true
+    secretName: nextcloud-secrets
+    usernameKey: db-username
+    passwordKey: password
 
 internalDatabase:
   enabled: false

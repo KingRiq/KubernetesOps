@@ -8,22 +8,10 @@
 #     var: ansible_facts.services
 
 
-# - name: Stop and disable Kubelet (if present)
-#   systemd:
-#     name: kubelet
-#     enabled: false
-#     state: stopped
-#   when: "'kubelet.service' in ansible_facts.services"
-
-# - name: Stop and disable containerd (if present)
-#   systemd:
-#     name: containerd
-#     enabled: false
-#     state: stopped
-#   when: "'containerd.service' in ansible_facts.services"
-
-  #optimize to do both at the same time
-  #TODO (low value)
+- name: Unmount all NFS and CIFS mounts
+  become: true
+  shell: |
+    umount -a -t nfs,cifs,smbfs
 
 - name: Run uninstall script (if exists)
   command: /usr/bin/rke2-uninstall.sh
