@@ -3,9 +3,7 @@
   vars:
     secret_namespace: nextcloud
     secret_name: nextcloud-secrets
-    secret_data:
-      username: "admin"
-      password: "{{ nextcloud_password }}"
+    secret_data: "{{ nextcloud_secrets }}"
 
 - name: Add Nextcloud Helm repo
   command: helm repo add nextcloud https://nextcloud.github.io/helm/
