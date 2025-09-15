@@ -42,6 +42,12 @@
     state: present
   become: true
 
+- name: Unmount anything currently mounted at /share (graceful)
+  mount:
+    path: /share
+    state: unmounted
+  ignore_errors: true
+
 - name: Ensure NFS export directories exist
   file:
     path: "{{ item.path }}"
@@ -71,11 +77,6 @@
   delegate_to: control-plane
   when: inventory_hostname in groups['control']
 
-- name: Unmount anything currently mounted at /share (graceful)
-  mount:
-    path: /share
-    state: unmounted
-  ignore_errors: true
 
 - name: Create local share directory
   file:
