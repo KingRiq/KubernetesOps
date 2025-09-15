@@ -1,0 +1,11 @@
+---
+- name: Create Kubernetes namespace
+  environment: "{{kube_env}}"
+  k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ namespace_name }}"
+

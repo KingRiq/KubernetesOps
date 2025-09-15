@@ -1,5 +1,7 @@
 ---
-#Mount a file share from a host machine (I don't have a current usecase for this yet. Going to try the nextcloud solutation and see how that works out before I proceed with this approach)
+# Right now the current use case is as follow:
+# A storage node will mount ALL configured drives to a directory which will be hosted via NFS
+# Refer to the Network Storage Protocol Diagram
 - import_playbook: evaluate_ip.yml
 - name: Mount SMB share on Linux nodes
   hosts: all

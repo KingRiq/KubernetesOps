@@ -1,5 +1,11 @@
 nfs_namespace: storage
 nfs_server_ip: 192.168.0.222
 nfs_export_path: "{{ storage_host_path }}"
-provisioner_name: nfs-server
-storage_class_name: nfs-rwx
+nfs_provisioner_name: nfs-client-provisioner
+storage_classes:
+  - name: nfs-rwx
+  - name: nfs-rwo
+  - name: nfs-rox
+
+additional_mount: ""
+additional_volumes: ""

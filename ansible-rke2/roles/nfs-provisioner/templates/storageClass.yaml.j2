@@ -1,7 +1,11 @@
+{% for sc in storage_classes %}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: {{ storage_class_name }}
-provisioner: {{ provisioner_name }}
-parameters:
-  archiveOnDelete: "false"
+  name: {{ sc.name }}
+provisioner: k8s-sigs.io/{{ nfs_provisioner_name }}
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+provisioner: {{ nfs_provisioner_name }}
+---
+{% endfor %}

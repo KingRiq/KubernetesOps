@@ -26,3 +26,12 @@
       when: state == 'present'
       tags:
         - metallb
+
+- name: Deploy NFS Provisioner
+  hosts: control
+  become: true
+  roles:
+    - role: nfs-provisioner
+      when: state == 'present'
+      tags:
+        - nfs

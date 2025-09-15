@@ -1,9 +1,0 @@
-- name: Deploy NFS provisioner
-  kubernetes.core.k8s:
-    state: present
-    definition: "{{ lookup('template', 'nfs-provisioner-deploy.yaml.j2') }}"
-
-- name: Create NFS StorageClass
-  kubernetes.core.k8s:
-    state: present
-    definition: "{{ lookup('template', 'storageClass.yaml.j2') }}"

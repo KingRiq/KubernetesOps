@@ -188,8 +188,8 @@ spec:
             - name: data
               mountPath: /data/share                # Samba shares this path
               mountPropagation: HostToContainer
-            # - name: nextcloud-nfs
-            #   mountPath: /data/nextcloud
+            - name: nextcloud-data
+              mountPath: /data/share/nextcloud-data
             - name: artemis-host
               mountPath: /data/share/Crystal_Tokyo
               mountPropagation: HostToContainer
@@ -212,22 +212,29 @@ spec:
         # - name: nextcloud-nfs         # <-- add this
         #   persistentVolumeClaim:    
         #     claimName: nextcloud-data # bind to your PVC
-        - name: artemis-host
-          hostPath:
-            path: /mnt/windows/share/Crystal_Tokyo
-            type: Directory
-        - name: luna-host
-          hostPath:
-            path: /mnt/windows/share/Silver_Millenium
-            type: Directory
-        - name: mac-host
-          hostPath:
-            path: /mnt/windows/share/Shadow_Galactica
-            type: Directory
-        - name: mariadb
-          hostPath:
-            path: /mnt/windows/share/nextcloud-mariadb
-            type: Directory
+        - name: nextcloud-data
+          persistentVolumeClaim:
+            claimName: nextcloud-data
+        # - name: artemis-host
+        #   hostPath:
+        #     path: /mnt/windows/share/Crystal_Tokyo
+        #     type: Directory
+        # - name: luna-host
+        #   hostPath:
+        #     path: /mnt/windows/share/Silver_Millenium
+        #     type: Directory
+        # - name: mac-host
+        #   hostPath:
+        #     path: /mnt/windows/share/Shadow_Galactica
+        #     type: Directory
+        # - name: mariadb
+        #   hostPath:
+        #     path: /mnt/windows/share/nextcloud-mariadb
+        #     type: Directory
+        # - name: nextcloud-data
+        #   hostPath:
+        #     path: /mnt/windows/share/nextcloud-data
+        #     type: Directory
 ---
 apiVersion: v1
 kind: Service
@@ -243,4 +250,19 @@ spec:
     - name: smb
       port: 445
       targetPort: 445
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+  namespace: {{ nextcloud_namespace }}
+spec:
+  type: ClusterIP                 
+  selector:
+    app: nfs-server
+  ports:
+    - name: nfs
+      port: 2049
+      targetPort: 2049
       protocol: TCP

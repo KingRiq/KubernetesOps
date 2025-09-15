@@ -1,0 +1,10 @@
+---
+- name: Remove Kubernetes namespace
+  environment: "{{kube_env}}"
+  k8s:
+    state: absent
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ namespace_name }}"
