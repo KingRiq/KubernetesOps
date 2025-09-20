@@ -7,5 +7,11 @@ provisioner: k8s-sigs.io/{{ nfs_provisioner_name }}
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 provisioner: {{ nfs_provisioner_name }}
+parameters:
+  pathPattern: "${.PVC.labels.dir}"
+  onDelete: retain            # never delete dirs
+  archiveOnDelete: "false"    # never rename dirs
+mountOptions:
+  - vers=4.1
 ---
 {% endfor %}

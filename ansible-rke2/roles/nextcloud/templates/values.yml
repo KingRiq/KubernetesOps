@@ -10,11 +10,11 @@ mariadb:
   primary:
     persistence:
       enabled: true
-      existingClaim: nextcloud-mariadb-pvc   # <-- must match the PVC you created in Ansible
+      existingClaim: nextcloud-mariadb   # <-- must match the PVC you created in Ansible
       accessModes:
         - ReadWriteOnce
-      size: 20Gi             # Helm chart still needs a size, but your PVC spec wins
-      storageClass: ""       # blank since we’re binding manually
+      size: 50Gi             # Helm chart still needs a size, but your PVC spec wins
+      storageClass: "rwo"       # blank since we’re binding manually
   containerSecurityContext:
     runAsUser: 0
     runAsGroup: 0
@@ -71,7 +71,9 @@ persistence:
   existingClaim: nextcloud-data
   accessMode: ReadWriteMany
   size: 2Ti
-  storageClass: ""                
+  storageClass: "rwx"  
+  name: nextcloud-data
+              
  
 service:
   type: LoadBalancer
@@ -104,6 +106,10 @@ internalDatabase:
 redis:
   enabled: true
   architecture: standalone
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/redis
+    tag: 8.2.1-debian-12-r0
 
   auth:
     enabled: false   # keep it simple at first; you can add a password later
@@ -111,6 +117,11 @@ redis:
   master:
     persistence:
       enabled: false
+      # storageClass: rwo
+      # size: 5Gi
+      # accessModes:
+      #   - ReadWriteOnce
+      # existingClaim: "nextcloud-redis"  
 
 global:
   security:

@@ -1,9 +1,14 @@
+# ================================
+# 1. Namespace
+# ================================
 apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ nextcloud_namespace }}
 ---
-# NFS server pod (exports {{ nfs_export_path }} to the cluster, backed by {{ storage_host_path }} on the node)
+# ================================
+# 2. NFS Server Deployment
+# ================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,7 +35,7 @@ spec:
             privileged: true
           env:
             - name: SHARED_DIRECTORY
-              value: "{{ nfs_export_path }}"         # path exported by the NFS container
+              value: "{{ nfs_export_path }}"
             - name: EXPORT_OPTIONS
               value: "rw,fsid=0,async,no_subtree_check,insecure,no_root_squash,crossmnt"
           ports:
@@ -43,7 +48,7 @@ spec:
             periodSeconds: 5
           volumeMounts:
             - name: nfs-data
-              mountPath: "{{ nfs_export_path }}"      # mount hostPath here inside the container
+              mountPath: "{{ nfs_export_path }}"
               mountPropagation: HostToContainer
             - name: nfs-crystal
               mountPath: /exports/Crystal_Tokyo
@@ -60,11 +65,11 @@ spec:
       volumes:
         - name: nfs-data
           hostPath:
-            path: "{{ storage_host_path }}"           # directory on the node
+            path: "{{ storage_host_path }}"
             type: DirectoryOrCreate
         - name: nfs-crystal
           hostPath:
-            path: /mnt/windows/share/Crystal_Tokyo   # CIFS mountpoint on worker1
+            path: /mnt/windows/share/Crystal_Tokyo
             type: DirectoryOrCreate
         - name: nfs-silver
           hostPath:
@@ -79,37 +84,82 @@ spec:
             path: /mnt/windows/share/nextcloud-mariadb
             type: DirectoryOrCreate
 ---
-# Static PV/PVC for Nextcloud (RWX to the NFS export)
+# ================================
+# 3. PersistentVolumeClaims (dynamic via StorageClass)
+# ================================
 apiVersion: v1
-kind: PersistentVolume
+kind: PersistentVolumeClaim
 metadata:
-  name: nextcloud-nfs-pv
+  name: artemis
+  namespace: {{ nextcloud_namespace }}
+  labels:
+    dir: Crystal_Tokyo
 spec:
-  capacity:
-    storage: 2Ti
   accessModes: ["ReadWriteMany"]
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: ""                                # avoid default StorageClass
-  nfs:
-    server: {{ storage_node_ip }}                     # node IP where NFS pod runs (hostNetwork)
-    path: "/nextcloud-data"                    # MUST match NFS export path
-  mountOptions:
-    - nfsvers=4.2
+  resources:
+    requests:
+      storage: 1Ti
+  storageClassName: nfs-rwx
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: luna
+  namespace: {{ nextcloud_namespace }}
+  labels:
+    dir: Silver_Millenium
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 1Ti
+  storageClassName: nfs-rwx
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: axion
+  namespace: {{ nextcloud_namespace }}
+  labels:
+    dir: Shadow_Galactica
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: nfs-rwx
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nextcloud-mariadb
+  namespace: {{ nextcloud_namespace }}
+  labels:
+    dir: nextcloud-mariadb
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: nfs-rwo
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: nextcloud-data
   namespace: {{ nextcloud_namespace }}
+  labels:
+    dir: nextcloud-data
 spec:
   accessModes: ["ReadWriteMany"]
   resources:
     requests:
-      storage: 2Ti
-  storageClassName: ""                                # bind to the static PV
-  volumeName: nextcloud-nfs-pv
+      storage: 500Gi
+  storageClassName: nfs-rwx
 ---
-# Samba config (exports /data/share from inside the container)
+# ================================
+# 4. Samba ConfigMap
+# ================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -136,9 +186,10 @@ data:
       guest ok = yes
       public = yes
       guest only = yes
-
 ---
-# Samba pod mounting the same NFS export; exposed via MetalLB
+# ================================
+# 5. Samba Deployment
+# ================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -166,7 +217,7 @@ spec:
             - "-s"
             - "CloudData;/data/share;yes;no;yes;all"
           securityContext: 
-            privileged: true   # needed if using mountPropagation
+            privileged: true
           lifecycle:
             preStop:
               exec:
@@ -209,40 +260,37 @@ spec:
           nfs:
             server: {{ storage_node_ip }}            # same node IP as PV
             path: "/"          # MUST match NFS export path
-        # - name: nextcloud-nfs         # <-- add this
-        #   persistentVolumeClaim:    
-        #     claimName: nextcloud-data # bind to your PVC
+        - name: artemis-host
+          hostPath:
+            path: /mnt/windows/share/Crystal_Tokyo
+            type: DirectoryOrCreate
+        - name: luna-host
+          hostPath:
+            path: /mnt/windows/share/Silver_Millenium
+            type: DirectoryOrCreate
+        - name: mac-host
+          hostPath:
+            path: /mnt/windows/share/Shadow_Galactica
+            type: DirectoryOrCreate
+        - name: mariadb
+          hostPath:
+            path: /mnt/windows/share/nextcloud-mariadb
+            type: DirectoryOrCreate
         - name: nextcloud-data
-          persistentVolumeClaim:
-            claimName: nextcloud-data
-        # - name: artemis-host
-        #   hostPath:
-        #     path: /mnt/windows/share/Crystal_Tokyo
-        #     type: Directory
-        # - name: luna-host
-        #   hostPath:
-        #     path: /mnt/windows/share/Silver_Millenium
-        #     type: Directory
-        # - name: mac-host
-        #   hostPath:
-        #     path: /mnt/windows/share/Shadow_Galactica
-        #     type: Directory
-        # - name: mariadb
-        #   hostPath:
-        #     path: /mnt/windows/share/nextcloud-mariadb
-        #     type: Directory
-        # - name: nextcloud-data
-        #   hostPath:
-        #     path: /mnt/windows/share/nextcloud-data
-        #     type: Directory
+          hostPath:
+            path: /mnt/windows/share/nextcloud-data
+            type: DirectoryOrCreate
 ---
+# ================================
+# 6. Services
+# ================================
 apiVersion: v1
 kind: Service
 metadata:
   name: samba-lb
   namespace: {{ nextcloud_namespace }}
 spec:
-  type: LoadBalancer                                   # MetalLB assigns an EXTERNAL-IP
+  type: LoadBalancer
   loadBalancerIP: {{ samba_assigned_ip }}
   selector:
     app: samba
@@ -258,7 +306,7 @@ metadata:
   name: nfs-server
   namespace: {{ nextcloud_namespace }}
 spec:
-  type: ClusterIP                 
+  type: ClusterIP
   selector:
     app: nfs-server
   ports:
