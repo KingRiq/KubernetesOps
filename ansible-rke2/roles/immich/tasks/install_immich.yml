@@ -1,0 +1,84 @@
+# - include_role:
+#     name: kube_secrets
+#   vars:
+#     secret_namespace: immich
+#     secret_name: immich-secrets
+#     secret_data: "{{ immich_secrets }}"
+
+- name: Add Immich Helm repo
+  command: helm repo add immich https://immich-app.github.io/immich-charts
+
+- name: Update Helm repos
+  command: helm repo update
+
+- name: Copy Immich values.yaml from template directory
+  template:
+    src: values.yml
+    dest: /tmp/immich-values.yaml
+
+- name: Create namespace for Immich
+  command: /var/lib/rancher/rke2/bin/kubectl create namespace immich
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  ignore_errors: yes
+  register: ns_create
+  failed_when: ns_create.rc != 0 and 'AlreadyExists' not in ns_create.stderr
+
+- name: Scale down Immich deployment to 0 replicas
+  kubernetes.core.k8s_scale:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: immich
+    name: immich
+    replicas: 0
+    kubeconfig: /etc/rancher/rke2/rke2.yaml
+  ignore_errors: yes
+
+- name: Create PersistentVolumeClaim for Immich library
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: immich-data
+        namespace: immich
+      spec:
+        accessModes:
+          - ReadWriteMany
+        resources:
+          requests:
+            storage: 50Gi
+        storageClassName: nfs-rwx   # adjust to your StorageClass
+
+# - name: Create PersistentVolumeClaim for Immich library
+#   environment:
+#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+#   k8s:
+#     state: present
+#     definition:
+#       apiVersion: v1
+#       kind: PersistentVolumeClaim
+#       metadata:
+#         name: data-immich-postgres-postgresql-0
+#         namespace: immich
+#       spec:
+#         accessModes:
+#           - ReadWriteOnce
+#         resources:
+#           requests:
+#             storage: 50Gi
+#         storageClassName: nfs-rwo   # adjust to your StorageClass
+
+- name: Deploy Immich with Helm
+  command: >
+    helm upgrade --install immich immich/immich --namespace immich -f /tmp/immich-values.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+
+- name: Wait for Immich pod to be ready
+  command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=immich -n immich --timeout=300s
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml

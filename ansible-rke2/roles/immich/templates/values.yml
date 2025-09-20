@@ -1,0 +1,132 @@
+# values.yaml for Immich Helm Chart
+immich:
+  image:
+    repository: ghcr.io/immich-app/immich-server
+    tag: v1.112.1 # change to latest stable
+    pullPolicy: IfNotPresent
+  service:
+    type: LoadBalancer
+    port: "80"
+    targetPort: "80"
+    loadBalancerIP: 192.168.0.223
+
+
+  persistence:
+    library:
+      enabled: true
+      existingClaim: immich-data-bby
+      globalMounts:
+        - path: /usr/src/app/upload
+  
+         
+env:
+  # Database
+  DB_HOST: immich-postgres.immich.svc.cluster.local
+  DB_PORT: "5432"
+
+  # Redis
+  REDIS_HOST: immich-redis
+  REDIS_PORT: "6379"
+
+  # REDIS_HOSTNAME: 
+  # DB_HOSTNAME: immich-postgresql
+
+  DB_USERNAME: immich
+  DB_DATABASE_NAME: immich_db
+  # -- You should provide your own secret outside of this helm-chart and use `postgresql.global.postgresql.auth.existingSecret` to provide credentials to the postgresql instance
+  DB_PASSWORD: securepassword
+  # IMMICH_MACHINE_LEARNING_URL: http://ml.chaoscauldron.space
+
+image:
+
+    # Machine learning worker paths
+    MACHINE_LEARNING_URL: http://ml.chaoscauldron.space
+
+    # Upload location inside the PVC
+    UPLOAD_LOCATION: /data/immich-data
+
+  # ingress:
+  #   enabled: true
+  #   className: nginx
+  #   annotations:
+  #     kubernetes.io/ingress.class: nginx
+  #   hosts:
+  #     - host: immich.local     # change to your domain
+  #       paths:
+  #         - path: /
+  #           pathType: Prefix
+  #   tls: [] # add cert-manager secret if you want HTTPS
+
+
+
+redis:
+  enabled: true
+  architecture: standalone
+  master:
+    persistence:
+      enabled: true
+      storageClass: nfs-rwo
+      size: 5Gi
+      accessModes:
+        - ReadWriteOnce
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/redis
+    tag: 8.2.1-debian-12-r0
+
+
+machine-learning:
+  enabled: true
+  image:
+    repository: ghcr.io/immich-app/immich-machine-learning
+    tag: v1.112.1
+    pullPolicy: IfNotPresent
+  # service:
+  #   type: LoadBalancer
+  #   port: 80
+  #   targetPort: 80
+  #   loadBalancerIP: 192.168.0.240
+  env:
+    TRANSFORMERS_CACHE: /cache
+  persistence:
+    cache:
+      enabled: true
+      size: 10Gi
+      # Optional: Set this to pvc to avoid downloading the ML models every start.
+      type: pvc
+      accessMode: ReadWriteMany
+      storageClass: nfs-rwx
+
+
+global:
+  security:
+    allowInsecureImages: true
+
+
+
+server:
+  enabled: true
+  image:
+    repository: ghcr.io/immich-app/immich-server
+    tag: v1.142.1
+    pullPolicy: IfNotPresent
+  service:
+    main:
+      enabled: true
+      primary: true
+      type: LoadBalancer
+      loadBalancerIP: 192.168.0.223  # from your MetalLB pool
+      ports:
+        http:
+          enabled: true
+          primary: true
+          port: 2283
+          protocol: HTTP
+        metrics-api:
+          enabled: false
+          port: 8081
+          protocol: HTTP
+        metrics-ms:
+          enabled: false
+          port: 8082
+          protocol: HTTP

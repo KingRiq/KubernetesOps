@@ -11,7 +11,7 @@
 - name: Unmount all NFS and CIFS mounts
   become: true
   shell: |
-    umount -a -t nfs,cifs,smbfs
+    umount -a -t nfs,cifs,smbfs -f
 
 - name: Run uninstall script (if exists)
   command: /usr/bin/rke2-uninstall.sh

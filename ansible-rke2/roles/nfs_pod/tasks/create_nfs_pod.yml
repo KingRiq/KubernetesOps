@@ -42,10 +42,8 @@
     state: present
   become: true
 
-- name: Unmount anything currently mounted at /share (graceful)
-  mount:
-    path: /share
-    state: unmounted
+- name: Force unmount if still mounted
+  command: umount -f /mnt/windows/share
   ignore_errors: true
 
 - name: Ensure NFS export directories exist
@@ -106,11 +104,20 @@
   until: nc_check.rc == 0
   changed_when: false
 
-- name: Mount CIFS samba exports from "{{ storage_node }}"
+# - name: Mount CIFS samba exports from "{{ storage_node }}"
+#   mount:
+#     path: /mnt/windows/share
+#     src: "//{{ samba_assigned_ip }}/CloudData"
+#     fstype: cifs
+#     opts: "username=galaxia,password=galaxia,vers=3.1.1,sec=ntlmssp,uid=1000,gid=1000,file_mode=0664,dir_mode=0775,noperm,_netdev"
+#     state: mounted
+#   when: inventory_hostname != storage_node
+
+- name: Mount NFS export from "{{ storage_node }}"
   mount:
-    path: /share
-    src: "//{{ samba_assigned_ip }}/CloudData"
-    fstype: cifs
-    opts: "username=galaxia,password=galaxia,vers=3.1.1,sec=ntlmssp,uid=1000,gid=1000,file_mode=0664,dir_mode=0775,noperm,_netdev"
+    path: /mnt/windows/share
+    src: "{{ storage_node_ip }}:/"
+    fstype: nfs
+    opts: "vers=4,rw,_netdev"
     state: mounted
   when: inventory_hostname != storage_node
