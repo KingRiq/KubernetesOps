@@ -1,0 +1,21 @@
+- name: Ensure PersistentVolumeClaim exists
+  environment: "{{kube_env}}"
+  k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: "{{ item.pvc_name }}"
+        namespace: "{{ namespace }}"
+        labels:
+          dir: "{{ namespace }}"
+      spec:
+        accessModes:
+          - "{{ 'ReadWriteMany' if item.multi_node_access else 'ReadWriteOnce' }}"
+        resources:
+          requests:
+            storage: "{{ item.storage }}"
+        storageClassName: "{{ item.storage_class }}"  # replace with your storage class
+  loop:
+    "{{ pvc_list }}"

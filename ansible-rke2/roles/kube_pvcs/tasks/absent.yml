@@ -1,0 +1,8 @@
+---
+- name: Delete PVC if it exists and creation disabled
+  environment: "{{kube_env}}"
+  k8s:
+    state: absent
+    kind: PersistentVolumeClaim
+    name: "{{pvc_name}}"
+    namespace: "{{namespace}}"
