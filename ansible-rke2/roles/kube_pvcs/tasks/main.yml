@@ -1,0 +1,6 @@
+---
+- include_tasks: present.yml
+  when: state == 'present'
+
+- include_tasks: absent.yml
+  when: state == 'absent'

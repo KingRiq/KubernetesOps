@@ -14,7 +14,7 @@ immich:
   persistence:
     library:
       enabled: true
-      existingClaim: immich-data-bby
+      existingClaim: immich-library
       globalMounts:
         - path: /usr/src/app/upload
   
@@ -35,7 +35,7 @@ env:
   DB_DATABASE_NAME: immich_db
   # -- You should provide your own secret outside of this helm-chart and use `postgresql.global.postgresql.auth.existingSecret` to provide credentials to the postgresql instance
   DB_PASSWORD: securepassword
-  # IMMICH_MACHINE_LEARNING_URL: http://ml.chaoscauldron.space
+  IMMICH_MACHINE_LEARNING_URL: http://ml.chaoscauldron.space
 
 image:
 
@@ -79,13 +79,19 @@ machine-learning:
   enabled: true
   image:
     repository: ghcr.io/immich-app/immich-machine-learning
-    tag: v1.112.1
+    tag: v1.143.1
     pullPolicy: IfNotPresent
-  # service:
-  #   type: LoadBalancer
-  #   port: 80
-  #   targetPort: 80
-  #   loadBalancerIP: 192.168.0.240
+  service:
+    main:
+      enabled: true
+      type: LoadBalancer
+      loadBalancerIP: 192.168.0.240
+      ports:
+        http:
+          enabled: true
+          port: 80
+          targetPort: 3003
+          protocol: TCP
   env:
     TRANSFORMERS_CACHE: /cache
   persistence:
@@ -96,6 +102,7 @@ machine-learning:
       type: pvc
       accessMode: ReadWriteMany
       storageClass: nfs-rwx
+      existingClaim: machine-learning
 
 
 global:
@@ -108,7 +115,7 @@ server:
   enabled: true
   image:
     repository: ghcr.io/immich-app/immich-server
-    tag: v1.142.1
+    tag: v1.143.1
     pullPolicy: IfNotPresent
   service:
     main:

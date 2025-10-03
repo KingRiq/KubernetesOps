@@ -2,7 +2,7 @@
 - include_role:
     name: kube_namespaces
   vars:
-    namespace_name: "{{ nfs_namespace }}"
+    namespace: "{{ nfs_namespace }}"
 
 - name: Deploy NFS provisioner
   environment: "{{kube_env}}"
