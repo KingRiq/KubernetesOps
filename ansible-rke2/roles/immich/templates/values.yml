@@ -79,7 +79,7 @@ machine-learning:
   enabled: true
   image:
     repository: ghcr.io/immich-app/immich-machine-learning
-    tag: v1.143.1
+    tag: release
     pullPolicy: IfNotPresent
   service:
     main:
@@ -115,7 +115,7 @@ server:
   enabled: true
   image:
     repository: ghcr.io/immich-app/immich-server
-    tag: v1.143.1
+    tag: release
     pullPolicy: IfNotPresent
   service:
     main:
