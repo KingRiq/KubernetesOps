@@ -6,3 +6,8 @@
   gather_facts: no
   roles:
     - rancher
+
+# - import_playbook: configure_fileshares.yml
+# - import_playbook: deploy-storage.yml
+# - import_playbook: deployNextcloud.yml
+# - import_playbook: deployImmich.yml

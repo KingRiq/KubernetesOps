@@ -30,7 +30,7 @@
         storage_class: nfs-rwo
         multi_node_access: false
       - pvc_name: machine-learning
-        storage: 5Gi
+        storage: 10Gi
         storage_class: nfs-rwx
         multi_node_access: true
   
@@ -57,51 +57,13 @@
     kubeconfig: /etc/rancher/rke2/rke2.yaml
   ignore_errors: yes
 
-- name: Create PersistentVolumeClaim for Immich library
-  environment:
-    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-  k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
-        name: immich-data
-        namespace: immich
-      spec:
-        accessModes:
-          - ReadWriteMany
-        resources:
-          requests:
-            storage: 50Gi
-        storageClassName: nfs-rwx   # adjust to your StorageClass
-
-# - name: Create PersistentVolumeClaim for Immich library
-#   environment:
-#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-#   k8s:
-#     state: present
-#     definition:
-#       apiVersion: v1
-#       kind: PersistentVolumeClaim
-#       metadata:
-#         name: data-immich-postgres-postgresql-0
-#         namespace: immich
-#       spec:
-#         accessModes:
-#           - ReadWriteOnce
-#         resources:
-#           requests:
-#             storage: 50Gi
-#         storageClassName: nfs-rwo   # adjust to your StorageClass
-
 - name: Deploy Immich with Helm
   command: >
     helm upgrade --install immich immich/immich --namespace immich -f /tmp/immich-values.yaml
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
 
-- name: Wait for Immich pod to be ready
-  command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=immich -n immich --timeout=300s
-  environment:
-    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+# - name: Wait for Immich pod to be ready
+#   command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=immich -n immich --timeout=300s
+#   environment:
+#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
