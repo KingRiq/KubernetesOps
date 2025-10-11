@@ -3,7 +3,7 @@ all:
     dev:
       ansible_host: 59.22.6.128
       internal_address:
-        ip: 59.22.6.200
+        ip: 59.22.60.200
         gateway: 59.22.0.1
         dns: 59.22.0.1
       external_address:

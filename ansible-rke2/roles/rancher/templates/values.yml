@@ -1,0 +1,9 @@
+# values/rancher-minimal.yaml
+hostname: rancher.local.fake   # real domain later
+replicas: 1
+
+# Keep ingress default on; you can still port-forward or NodePort temporarily.
+ingress:
+  tls:
+    source: secret             # or set later to letsEncrypt/secret
+bootstrapPassword: "{{ ansible_ssh_pass }}"

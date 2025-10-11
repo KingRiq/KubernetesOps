@@ -13,6 +13,10 @@
   shell: |
     umount -a -t nfs,cifs,smbfs -f
 
+- name: KILLEMALL!!
+  become: true
+  script: "{{ role_path }}/files/killemall.sh"
+
 - name: Run uninstall script (if exists)
   command: /usr/bin/rke2-uninstall.sh
   register: uninstall_result

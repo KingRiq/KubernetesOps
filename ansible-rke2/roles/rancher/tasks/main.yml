@@ -1,0 +1,6 @@
+---
+- include_tasks: install_rancher.yml
+  when: state == 'present'
+
+- include_tasks: uninstall_rancher.yml
+  when: state == 'absent'
