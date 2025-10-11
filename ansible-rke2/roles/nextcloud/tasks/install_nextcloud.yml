@@ -10,18 +10,29 @@
     src: values.yml
     dest: /tmp/nextcloud-values.yaml
 
-- name: Create namespace for Nextcloud
-  command: /var/lib/rancher/rke2/bin/kubectl create namespace nextcloud
-  environment:
-    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-  ignore_errors: yes
-  register: ns_create
-  failed_when: ns_create.rc != 0 and 'AlreadyExists' not in ns_create.stderr
+- include_role:
+    name: kube_namespaces
+  vars: 
+    namespace: "{{ nextcloud_namespace }}"
+
+- include_role:
+    name: kube_pvcs
+  vars:
+    namespace: "{{ nextcloud_namespace }}"
+    pvc_list:
+      - pvc_name: nextcloud-data
+        storage: 1Ti
+        storage_class: nfs-rwx
+        multi_node_access: true
+      - pvc_name: nextcloud-mariadb
+        storage: 20Gi
+        storage_class: nfs-rwo
+        multi_node_access: false
 
 - include_role:
     name: kube_secrets
   vars:
-    secret_namespace: nextcloud
+    secret_namespace: "{{ nextcloud_namespace }}"
     secret_name: nextcloud-secrets
     secret_data: "{{ nextcloud_secrets }}"
     
@@ -29,7 +40,7 @@
   kubernetes.core.k8s_scale:
     api_version: apps/v1
     kind: Deployment
-    namespace: nextcloud
+    namespace: "{{ nextcloud_namespace }}"
     name: nextcloud
     replicas: 0
     kubeconfig: /etc/rancher/rke2/rke2.yaml
@@ -37,11 +48,11 @@
 
 - name: Deploy Nextcloud with Helm
   command: >
-    helm upgrade --install nextcloud nextcloud/nextcloud --namespace nextcloud -f /tmp/nextcloud-values.yaml
+    helm upgrade --install nextcloud nextcloud/nextcloud --namespace "{{ nextcloud_namespace }}" -f /tmp/nextcloud-values.yaml
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
 
-- name: Wait for Nextcloud pod to be ready
-  command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=nextcloud -n nextcloud --timeout=300s
-  environment:
-    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+# - name: Wait for Nextcloud pod to be ready
+#   command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=nextcloud -n nextcloud --timeout=300s
+#   environment:
+#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml

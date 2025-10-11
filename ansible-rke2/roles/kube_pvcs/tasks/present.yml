@@ -1,4 +1,4 @@
-- name: Ensure PersistentVolumeClaim exists
+- name: Create PersistentVolumeClaim (PVC)
   environment: "{{kube_env}}"
   k8s:
     state: present
@@ -9,7 +9,7 @@
         name: "{{ item.pvc_name }}"
         namespace: "{{ namespace }}"
         labels:
-          dir: "{{ namespace }}"
+          dir: "{{ item.pvc_name }}"
       spec:
         accessModes:
           - "{{ 'ReadWriteMany' if item.multi_node_access else 'ReadWriteOnce' }}"
