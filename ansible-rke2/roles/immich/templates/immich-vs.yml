@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: immich-vs
+  namespace: networking
+spec:
+  hosts:
+    - photos.chaoscauldron.space
+  gateways:
+    - networking/galaxia-gateway  # should already be defined 
+  http:
+    - route:
+        - destination:
+            host: immich-server.immich.svc.cluster.local
+            port:
+              number: 2283

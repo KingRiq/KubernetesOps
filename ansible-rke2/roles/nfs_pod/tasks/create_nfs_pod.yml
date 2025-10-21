@@ -61,7 +61,7 @@
 - name: Remove old samba deployment if exists
   become: yes
   command: >
-    /var/lib/rancher/rke2/bin/kubectl -n {{ nextcloud_namespace }} delete deployment samba --ignore-not-found
+    /var/lib/rancher/rke2/bin/kubectl -n storage delete deployment samba --ignore-not-found
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
   delegate_to: control-plane

@@ -134,34 +134,6 @@ spec:
       storage: 100Gi
   storageClassName: nfs-rwx
 ---
-# apiVersion: v1
-# kind: PersistentVolumeClaim
-# metadata:
-#   name: nextcloud-mariadb
-#   namespace: {{ nextcloud_namespace }}
-#   labels:
-#     dir: nextcloud-mariadb
-# spec:
-#   accessModes: ["ReadWriteOnce"]
-#   resources:
-#     requests:
-#       storage: 50Gi
-#   storageClassName: nfs-rwo
-# ---
-# apiVersion: v1
-# kind: PersistentVolumeClaim
-# metadata:
-#   name: nextcloud-data
-#   namespace: {{ nextcloud_namespace }}
-#   labels:
-#     dir: nextcloud-data
-# spec:
-#   accessModes: ["ReadWriteMany"]
-#   resources:
-#     requests:
-#       storage: 500Gi
-#   storageClassName: nfs-rwx
----
 # ================================
 # 4. Samba ConfigMap
 # ================================

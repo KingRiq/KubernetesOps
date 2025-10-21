@@ -1,0 +1,5 @@
+meshConfig:
+  accessLogFile: /dev/stdout    # see HTTP traffic in sidecar logs
+pilot:
+  autoscaleEnabled: true        # allow HPA for istiod
+defaultRevision: default        # mark this control plane as the default

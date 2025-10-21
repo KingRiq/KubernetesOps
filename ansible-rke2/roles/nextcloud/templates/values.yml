@@ -31,12 +31,14 @@ nextcloud:
     secretName: nextcloud-secrets
     usernameKey: username
     passwordKey: password
-
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
   trustedDomains:             
-    - 192.168.0.100
-    - 192.168.0.101
-    - 192.168.0.102
-    - 192.168.0.103
     - 192.168.0.222
     - cloud.chaoscauldron.space
     - nextcloud.default.svc

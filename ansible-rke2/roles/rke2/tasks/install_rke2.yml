@@ -32,7 +32,6 @@
     executable: pip3
   become: true
 
-
 - name: Restart NetworkManager
   service:
     name: NetworkManager

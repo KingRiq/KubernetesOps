@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: nextcloud-vs
+  namespace: networking
+spec:
+  hosts:
+    - cloud.chaoscauldron.space
+  gateways:
+    - networking/galaxia-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: nextcloud.nextcloud.svc.cluster.local
+            port:
+              number: 80

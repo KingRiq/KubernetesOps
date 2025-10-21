@@ -13,36 +13,23 @@
 - name: Add Rancher to Helm repo
   command: helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
 
-- name: Add Jetstack to Helm repo
-  command: helm repo add jetstack https://charts.jetstack.io
+- name: Copy Rancher rancher-service.yml from template directory
+  template:
+    src: rancher-service.yml
+    dest: /tmp/rancher-service.yml
 
-- name: Update Helm repos
-  command: helm repo update
-
-- name: Install/upgrade cert-manager (latest) via Helm repo
-  become: true
-  environment:
-    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-  kubernetes.core.helm:
-    name: cert-manager
-    chart_ref: jetstack/cert-manager
-    # IMPORTANT: omit version => always installs newest available
-    chart_version: "{{ cert_manager_version | default(omit) }}"
-    release_namespace: cert-manager
-    create_namespace: true
-    wait: true
-    atomic: true
-    timeout: 600s
-    values:
-      installCRDs: true
-    values_files: []  
+- name: Apply Rancher-service used to access rancher UI
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/rke2/rke2.yaml
+    state: present
+    src: /tmp/rancher-service.yml
 
 # Put values on manager node for quick testing and rollingforward strats
-
 - name: Copy Rancher values.yaml from template directory
   template:
     src: values.yml
     dest: /tmp/rancher-values.yml
+    
 - name: Install/upgrade Rancher (latest) via Helm repo
   become: true
   environment:
@@ -59,69 +46,3 @@
     force: true
     values_files:
       - /tmp/rancher-values.yml
-
-
-# - name: Copy Immich values.yaml from template directory
-#   template:
-#     src: values.yml
-#     dest: /tmp/immich-values.yaml
-
-
-# - name: Scale down Immich deployment to 0 replicas
-#   kubernetes.core.k8s_scale:
-#     api_version: apps/v1
-#     kind: Deployment
-#     namespace: immich
-#     name: immich
-#     replicas: 0
-#     kubeconfig: /etc/rancher/rke2/rke2.yaml
-#   ignore_errors: yes
-
-# - name: Create PersistentVolumeClaim for Immich library
-#   environment:
-#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-#   k8s:
-#     state: present
-#     definition:
-#       apiVersion: v1
-#       kind: PersistentVolumeClaim
-#       metadata:
-#         name: immich-data
-#         namespace: immich
-#       spec:
-#         accessModes:
-#           - ReadWriteMany
-#         resources:
-#           requests:
-#             storage: 50Gi
-#         storageClassName: nfs-rwx   # adjust to your StorageClass
-
-# # - name: Create PersistentVolumeClaim for Immich library
-# #   environment:
-# #     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-# #   k8s:
-# #     state: present
-# #     definition:
-# #       apiVersion: v1
-# #       kind: PersistentVolumeClaim
-# #       metadata:
-# #         name: data-immich-postgres-postgresql-0
-# #         namespace: immich
-# #       spec:
-# #         accessModes:
-# #           - ReadWriteOnce
-# #         resources:
-# #           requests:
-# #             storage: 50Gi
-# #         storageClassName: nfs-rwo   # adjust to your StorageClass
-
-# - name: Deploy Immich with Helm
-#   command: >
-#     helm upgrade --install immich immich/immich --namespace immich -f /tmp/immich-values.yaml
-#   environment:
-#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-
-# - name: Wait for Immich pod to be ready
-#   command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=immich -n immich --timeout=300s
-#   environment:
-#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml

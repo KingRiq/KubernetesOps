@@ -1,0 +1,56 @@
+- name: Add Jetstack to Helm repo
+  command: helm repo add jetstack https://charts.jetstack.io
+
+- name: Update Helm repos
+  command: helm repo update
+
+- name: Install/upgrade cert-manager (latest) via Helm repo
+  become: true
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  kubernetes.core.helm:
+    name: cert-manager
+    chart_ref: jetstack/cert-manager
+    # IMPORTANT: omit version => always installs newest available
+    chart_version: "{{ cert_manager_version | default(omit) }}"
+    release_namespace: cert-manager
+    create_namespace: true
+    wait: true
+    atomic: true
+    timeout: 600s
+    values:
+      installCRDs: true
+    values_files: []  
+
+- name: Wait until cert-manager CRD is ready
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: clusterissuers.cert-manager.io
+  register: crd_check
+  until: crd_check is defined and crd_check.resources is defined and crd_check.resources | length > 0
+  retries: 10
+  delay: 6
+
+- include_role:
+    name: kube_secrets
+  vars:
+    secret_namespace: cert-manager
+    secret_name: cloudflare-api-token-secret
+    secret_data: 
+      api-token: "{{ cloudflared_token }}"
+
+# Get A legit Cert Issuer
+- include_role:
+    name: letsencrypt
+
+# Create GOD CERT!
+- include_role:
+    name: certificate
+  vars: 
+    secret_name: "galaxia-tls"
+    dnsNamesList:
+      - "*.chaoscauldron.space"
+      - "chaoscauldron.space"
+    certificate_name: galaxia-god-cert
