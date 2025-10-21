@@ -4,13 +4,6 @@
 #     secret_namespace: immich
 #     secret_name: immich-secrets
 #     secret_data: "{{ immich_secrets }}"
-- name: Create namespace for Immich
-  command: /var/lib/rancher/rke2/bin/kubectl create namespace immich
-  environment:
-    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-  ignore_errors: yes
-  register: ns_create
-  failed_when: ns_create.rc != 0 and 'AlreadyExists' not in ns_create.stderr
 - include_role:
     name: kube_namespaces
   vars: 
@@ -41,10 +34,15 @@
 - name: Update Helm repos
   command: helm repo update
 
-- name: Copy Immich values.yaml from template directory
+- name: Copy Immich values.yml from template directory
   template:
     src: values.yml
-    dest: /tmp/immich-values.yaml
+    dest: /tmp/immich-values.yml
+
+- name: Copy Immich values.yaml from template directory
+  template:
+    src: immich-postgres.yml
+    dest: /tmp/immich-postgres.yml
 
 
 - name: Scale down Immich deployment to 0 replicas
@@ -57,13 +55,45 @@
     kubeconfig: /etc/rancher/rke2/rke2.yaml
   ignore_errors: yes
 
+- name: Apply Immich Postgres statefulset manifest
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/rke2/rke2.yaml
+    state: present
+    src: /tmp/immich-postgres.yml
+
 - name: Deploy Immich with Helm
   command: >
-    helm upgrade --install immich immich/immich --namespace immich -f /tmp/immich-values.yaml
+    helm upgrade --install immich immich/immich --namespace immich -f /tmp/immich-values.yml
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
 
-# - name: Wait for Immich pod to be ready
-#   command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=immich -n immich --timeout=300s
-#   environment:
-#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+- name: Copy Immich VirtualService from template directory
+  template:
+    src: immich-vs.yml
+    dest: /tmp/immich-vs.yml
+
+- name: Apply Immich VirtualService
+  delegate_to: control-plane
+  become: true
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/rke2/rke2.yaml
+    state: present
+    definition: "{{ lookup('template', 'immich-vs.yml') }}"
+
+- name: Copy Immich VirtualService from template directory
+  template:
+    src: machine-vs.yml
+    dest: /tmp/machine-vs.yml
+
+- name: Apply Immich VirtualService
+  delegate_to: control-plane
+  become: true
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/rke2/rke2.yaml
+    state: present
+    definition: "{{ lookup('template', 'machine-vs.yml') }}"
+
+- name: Wait for Immich pod to be ready
+  command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=immich-server -n immich --timeout=300s
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml

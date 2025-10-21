@@ -1,0 +1,10 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: galaxia-gateway
+  namespace: networking
+spec:
+  selector:
+    istio: ingressgateway
+  servers: {{ tls_servers }}
+

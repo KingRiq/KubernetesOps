@@ -1,0 +1,12 @@
+- name: Copy Certificate from template directory
+  template:
+    src: certificate.yml.j2
+    dest: /tmp/certificate.yml.j2
+
+- name: Apply Certificate to Cluster
+  delegate_to: control-plane
+  become: true
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/rke2/rke2.yaml
+    state: present
+    definition: "{{ lookup('template', 'certificate.yml.j2') }}"

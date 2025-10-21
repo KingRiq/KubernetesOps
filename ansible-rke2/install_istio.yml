@@ -1,9 +1,9 @@
 - import_playbook: evaluate_ip.yml
 - import_playbook: install_helm.yml
-- name: Deploy Rancher 
+
+- name: Deploy Istio
   hosts: control
   become: true
   gather_facts: no
-  roles:
-    - rancher
-
+  roles: 
+    - istio

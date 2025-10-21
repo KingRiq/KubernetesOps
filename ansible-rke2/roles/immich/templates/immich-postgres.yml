@@ -1,0 +1,62 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: immich
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-postgresql
+  namespace: immich
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: immich-postgresql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: immich-postgresql
+  namespace: immich
+spec:
+  serviceName: immich-postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-postgresql
+  template:
+    metadata:
+      labels:
+        app: immich-postgresql
+    spec:
+      containers:
+      - name: postgres
+        image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: immich_db
+        - name: POSTGRES_USER
+          value: immich
+        - name: POSTGRES_PASSWORD
+          value: securepassword
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+      labels:
+        dir: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: nfs-rwo
+      resources:
+        requests:
+          storage: 20Gi

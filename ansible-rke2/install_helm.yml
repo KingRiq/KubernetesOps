@@ -8,9 +8,8 @@
   vars: 
     helm_arch: linux-amd64
     helm_base_url: "https://get.helm.sh"
-
   tasks:
-    - name: Ensure required packages are presnet (Rocky9)
+    - name: Ensure required packages are present (Rocky9)
       dnf:
         name:
           - curl

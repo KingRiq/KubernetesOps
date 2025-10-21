@@ -14,12 +14,14 @@
 - name: "{{ state }}ing RKE2 nodes "
   hosts: ClusterGroup
   become: true
+  gather_facts: false
   roles:
     - role: rke2
 
 
 - name: Deploy MetalLB 
   hosts: control
+  gather_facts: false
   become: true
   roles:
     - role: metallb
@@ -27,11 +29,52 @@
       tags:
         - metallb
 
+- name: Deploy Istio
+  hosts: control
+  gather_facts: false
+  become: true
+  roles:
+    - role: istio
+      when: state == 'present'
+      tags:
+        - istio
+
+- name: Deploy Certmanager
+  hosts: control
+  gather_facts: false
+  become: true
+  roles:
+    - role: cert_manager
+      when: state == 'present'
+      tags:
+        - certs
+
 - name: Deploy NFS Provisioner
   hosts: control
+  gather_facts: false
   become: true
   roles:
     - role: nfs-provisioner
       when: state == 'present'
       tags:
         - nfs
+
+- import_playbook: configure_fileshares.yml
+  tags:
+    - nfs
+  when: state == 'present'
+
+- import_playbook: deploy_storage.yml
+  tags:
+    - nfs
+  when: state == 'present'
+    
+- name: Deploy Rancher 
+  hosts: control
+  gather_facts: false
+  become: true
+  roles:
+    - role: rancher
+      when: state == 'present'
+      tags:
+        - rancher

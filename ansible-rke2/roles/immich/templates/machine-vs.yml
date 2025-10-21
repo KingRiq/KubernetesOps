@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: immich-machine-learning-vs
+  namespace: networking
+spec:
+  hosts:
+    - ml.chaoscauldron.space
+  gateways:
+    - networking/galaxia-gateway  # should already be defined 
+  http:
+    - route:
+        - destination:
+            host: immich-machine-learning.immich.svc.cluster.local
+            port:
+              number: 80

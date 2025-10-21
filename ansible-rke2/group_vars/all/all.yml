@@ -28,11 +28,6 @@ rke_ports:
   - port: 53      # desc: "DNS (CoreDNS)" }
     protocol: tcp 
 
-
-
-# Storage + Samba settings
-nextcloud_namespace: nextcloud
-
 # The node that owns the USB/external hard drive
 storage_host_path: /mnt/windows/share/
 next_cloud_storage_path: "{{ storage_host_path }}/nextcloud-data"
@@ -40,3 +35,24 @@ next_cloud_storage_path: "{{ storage_host_path }}/nextcloud-data"
 # SMB user bootstrap (optional)
 smb_user: eriq
 smb_pass: "changeme"   # leave empty ("") if you want to skip
+
+tls_servers:
+  - port:
+      number: 443
+      name: https-galaxia
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: galaxia-tls
+    hosts:
+      - "*.chaoscauldron.space"
+      - "chaoscauldron.space"
+  - port:
+      number: 80
+      name: http-galaxia
+      protocol: HTTP
+    hosts:
+      - "*.chaoscauldron.space"
+      - "chaoscauldron.space"
+    tls:
+      httpsRedirect: false

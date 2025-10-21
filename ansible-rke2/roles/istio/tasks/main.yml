@@ -1,0 +1,172 @@
+---
+- name: Create istio-system Namespace
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    context: default
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "istio-system"
+
+# Helm management
+
+- name: Add Istio Helm repo
+  command: helm repo add istio https://istio-release.storage.googleapis.com/charts
+
+- name: Update Helm repos
+  command: helm repo update
+
+- name: Copy istio-base from template directory
+  template:
+    src: values-istio-base.yml
+    dest: /tmp/values-istio-base.yml
+
+
+
+- name: Install Istio-base (CRDs only) and apply them
+  community.kubernetes.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: istio-base
+    chart_ref: istio/base
+    release_namespace: istio-system
+    wait: true
+    wait_timeout: 600s
+    values_files:
+      - "/tmp/values-istio-base.yml"
+
+- name: Copy istiod from template directory
+  template:
+    src: values-istiod.yml
+    dest: /tmp/values-istiod.yml
+
+
+- name: Install istiod (Istio control plane)
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: istiod                    # Helm release name for control plane
+    chart_ref: istio/istiod         # The control-plane chart
+    release_namespace: istio-system # Lives with base CRDs
+    wait: true                      # Block until Helm sees resources ready
+    wait_timeout: 900s
+    atomic: true
+    values_files:
+      - "/tmp/values-istiod.yml"
+
+# - name: Wait for istiod Ready (verify reality, not just Helm)
+#   kubernetes.core.k8s_info:
+#     kubeconfig: "{{ k8s_kubeconfig }}"
+#     api_version: apps/v1
+#     kind: Deployment
+#     namespace: istio-system
+#     name: istiod
+#   register: istiod_dep
+#   until: (istiod_dep.resources|length>0) and ((istiod_dep.resources[0].status.readyReplicas|default(0))>0)
+#   retries: 24
+#   delay: 10
+#   delay: 10
+
+
+- name: Ensure istio-ingress namespace exists
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata: 
+        name: istio-ingress
+
+- name: Copy ingressgateway from template directory
+  template:
+    src: values-ingressgateway.yml
+    dest: /tmp/values-ingressgateway.yml
+
+- name: Install/Upgrade ingress gateway
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: istio-ingress
+    chart_ref: istio/gateway
+    release_namespace: istio-ingress
+    values_files:
+      - "/tmp/values-ingressgateway.yml"
+    wait: true
+    wait_timeout: 600s
+    atomic: true
+
+- name: Copy Default gateway from template directory
+  template:
+    src: default-gateway.yml.j2
+    dest: /tmp/default-gateway.yml
+
+- name: Create Network Namespace
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    context: default
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "networking"
+
+- name: Apply Gateway (networking namespace)
+  delegate_to: control-plane
+  become: true
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition: "{{ lookup('template', 'default-gateway.yml.j2') }}"
+    
+- name: Copy ingress-class.yml from template directory
+  template:
+    src: ingress-class.yml
+    dest: /tmp/ingress-class.yml
+
+- name: Apply Istio Ingress Class to Cluster
+  delegate_to: control-plane
+  become: true
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition: "{{ lookup('template', 'ingress-class.yml') }}"
+
+
+# - name: Create istio-cni Namespace
+#   kubernetes.core.k8s:
+#     kubeconfig: "{{ kubeconfig }}"
+#     context: default
+#     state: present
+#     definition:
+#       apiVersion: v1
+#       kind: Namespace
+#       metadata:
+#         name: "istio-cni"
+
+# - name: Install/Upgrade Istio CNI
+#   kubernetes.core.helm:
+#     kubeconfig: "{{ kubeconfig }}"
+#     name: istio-cni
+#     chart_ref: istio/cni
+#     release_namespace: istio-system
+#     wait: true
+#     wait_timeout: 600s
+#     atomic: true
+
+# - name: Show gateway EXTERNAL-IP (for DNS/Cloudflare)
+#   kubernetes.core.k8s_info:
+#     kubeconfig: "{{ kubeconfig }}"
+#     api_version: v1
+#     kind: Service
+#     namespace: istio-ingress
+#     label_selectors:
+#       - istio=ingressgateway
+#   register: gw_svc
+# - debug:
+#     msg: >
+#       Ingress LB: {{
+#         (gw_svc.resources[0].status.loadBalancer.ingress[0].ip
+#           | default(gw_svc.resources[0].status.loadBalancer.ingress[0].hostname
+#           | default('pending')))
+#       }}

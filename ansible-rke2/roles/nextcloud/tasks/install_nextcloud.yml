@@ -52,6 +52,19 @@
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
 
+- name: Copy Nextcloud Virtual Service from template directory
+  template:
+    src: nextcloud-vs.yml
+    dest: /tmp/nextcloud-vs.yml
+
+- name: Apply Nextcloud VirtualService
+  delegate_to: control-plane
+  become: true
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition: "{{ lookup('template', 'nextcloud-vs.yml') }}"
+
 # - name: Wait for Nextcloud pod to be ready
 #   command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=nextcloud -n nextcloud --timeout=300s
 #   environment:
