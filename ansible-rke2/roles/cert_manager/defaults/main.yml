@@ -1,1 +1,3 @@
-idk: idk
+
+cert_crt_path: "{{ cert_dir }}/galaxia.crt"
+cert_key_path: "{{ cert_dir }}/galaxia.key"

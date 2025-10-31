@@ -19,7 +19,7 @@
         fstype: "{{ fstype }}"
         state: absent
 
-    - name: Remove mount directory
-      file:
-        path: "{{ mount_point }}"
-        state: absent
+    # - name: Remove mount directory
+    #   file:
+    #     path: "{{ mount_point }}"
+    #     state: absent

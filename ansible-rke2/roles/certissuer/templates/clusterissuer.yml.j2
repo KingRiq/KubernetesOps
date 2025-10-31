@@ -1,0 +1,22 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ issuer_name }}
+spec:
+{% if self_signed is undefined or self_signed == 'false' %}
+  acme:
+    email: eriqrhampton@yahoo.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: {{ letsencrypt_issuer_name }}
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-secret
+              key: api-token
+{% else %}
+  ca:
+    secretName: galaxia-ca-secret
+{% endif %}

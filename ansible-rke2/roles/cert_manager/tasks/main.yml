@@ -41,11 +41,80 @@
     secret_data: 
       api-token: "{{ cloudflared_token }}"
 
-# Get A legit Cert Issuer
-- include_role:
-    name: letsencrypt
+- name: Ensure istio-ingress namespace exists
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata: 
+        name: istio-ingress
 
-# Create GOD CERT!
+- name: Check if TLS secret already exists
+  ansible.builtin.command: >
+    /var/lib/rancher/rke2/bin/kubectl get secret galaxia-tls -n istio-ingress
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  register: tls_secret_check
+  failed_when: false
+
+- name: Check if certificate file exists
+  stat:
+    path: "{{ cert_crt_path }}"
+  register: crt_file
+
+- name: Check if certificate file exists
+  stat:
+    path: "{{ cert_key_path }}"
+  register: key_file
+
+- name: Create TLS secret using kubectl
+  ansible.builtin.command: >
+    /var/lib/rancher/rke2/bin/kubectl create secret tls galaxia-tls
+    --cert="{{cert_crt_path}}"
+    --key="{{cert_key_path}}"
+    -n istio-ingress
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  when: "tls_secret_check.rc !=0 and crt_file.stat.exists and key_file.stat.exists"
+
+# Cert should be properly created now but register failures
+- name: Verify Cert exists now
+  ansible.builtin.command: >
+    /var/lib/rancher/rke2/bin/kubectl get secret galaxia-tls -n istio-ingress
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  register: tls_secret_verify
+  failed_when: false
+
+# # --- Debug local file checks ---
+# - name: Debug certificate file check
+#   ansible.builtin.debug:
+#     msg:
+#       - "cert exists: {{ crt_file.stat.exists | default('undefined') }}"
+#       - "key exists: {{ key_file.stat.exists | default('undefined') }}"
+#       - "cert path: {{ cert_crt_path }}"
+#       - "key path: {{ cert_key_path }}"
+
+# --- Debug Kubernetes secret check ---
+- name: Debug TLS secret check
+  ansible.builtin.debug:
+    msg:
+      - "Secret get command stdout: {{ tls_secret_verify | default('none') }}"
+      # - "Secret get command stderr: {{ tls_secret_verify.rc | default('none') }}"
+      # - "Return code: {{ tls_secret_check | default('none') }}"
+      # - "Return code: {{ tls_secret_check.rc | default('none') }}"
+      # - "Secret exists? {{ 'NotFound' in tls_secret_check.stderr }}"
+      # - "BOOLEAN?: {{ tls_secret_verify.rc == 1 or not crt_file.stat.exists or not key_file.stat.exists }}"
+
+# Otherwise Get A legit Cert Issuer only if we want to use a legitimate cert
+- include_role:
+    name: certissuer
+  # Use a configured issuer if we dont have one created (tls secret created)
+  when: "(tls_secret_verify.rc == 1 or not crt_file.stat.exists or not key_file.stat.exists) or (self_signed is defined and self_signed == 'true') "
+
+# Request A GOD CERT!
 - include_role:
     name: certificate
   vars: 
@@ -54,3 +123,5 @@
       - "*.chaoscauldron.space"
       - "chaoscauldron.space"
     certificate_name: galaxia-god-cert
+  # if we didn't already have a good cert or we want for some reason a signed one
+  when: "(tls_secret_verify.rc == 1 or not crt_file.stat.exists or not key_file.stat.exists) or (self_signed is defined and self_signed == 'true')"

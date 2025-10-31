@@ -19,13 +19,31 @@ It’s often described as a private alternative to Google Drive, OneDrive, or Dr
 Key features:
 - File storage and sync → store files, photos, and documents, and access them from desktops, browsers, or mobile apps.  
 
+ADD Immich
+
+
+
+
+Immich
+
+
+
+Websites
+Saira's Web Portfolio websites which should be completely deployed from a docker image of some sort. Should I host my own images? Find out on the next episode!
 ---
 
 ### Kubernetes
-Kubernetes runs the **Nextcloud application** and manages its pods, services, and scaling.  
+Kubernetes runs the **Nextcloud and Immich applications** and manages its pods, services, and scaling.  
 It provides orchestration so workloads can move around nodes while maintaining availability.  
 
 ---
 
 ### NFS
 An **NFS server inside the cluster** provides a **shared storage back**
+
+Samba is used as a file share for compatibility across multiple windows and mac machines
+
+
+Talk about NFS Provisioner -> Eventually will switch to CNI and use longhorn for replication... but what?
+
+Potentally will host an LLM for musi transferring. Need to get rid of spotify but not real solution exists.

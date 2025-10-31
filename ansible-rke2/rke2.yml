@@ -29,6 +29,32 @@
       tags:
         - metallb
 
+- name: Deploy NFS Provisioner
+  hosts: control
+  gather_facts: false
+  become: true
+  roles:
+    - role: nfs-provisioner
+      when: state == 'present'
+      tags:
+        - nfs
+
+- import_playbook: deploy_storage.yml
+  tags:
+    - nfs
+  when: state == 'present'
+
+- import_playbook: configure_fileshares.yml
+  tags:
+    - nfs
+  when: state == 'present'
+
+
+- import_playbook: remove_fileshares.yml
+  tags:
+    - nfs
+  when: state == 'absent'
+
 - name: Deploy Istio
   hosts: control
   gather_facts: false
@@ -49,26 +75,6 @@
       tags:
         - certs
 
-- name: Deploy NFS Provisioner
-  hosts: control
-  gather_facts: false
-  become: true
-  roles:
-    - role: nfs-provisioner
-      when: state == 'present'
-      tags:
-        - nfs
-
-- import_playbook: configure_fileshares.yml
-  tags:
-    - nfs
-  when: state == 'present'
-
-- import_playbook: deploy_storage.yml
-  tags:
-    - nfs
-  when: state == 'present'
-    
 - name: Deploy Rancher 
   hosts: control
   gather_facts: false
