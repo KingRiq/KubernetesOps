@@ -90,46 +90,4 @@
     state: started
   when: inventory_hostname in groups['workers']
 
-# - name: Create ingress-nginx LoadBalancer Service (control-plane only)
-#   command: /var/lib/rancher/rke2/bin/kubectl apply -f -
-#   args:
-#     stdin: |
-#       apiVersion: v1
-#       kind: Service
-#       metadata:
-#         name: ingress-nginx-lb
-#         namespace: kube-system
-#       spec:
-#         type: LoadBalancer
-#         selector:
-#           app.kubernetes.io/name: rke2-ingress-nginx
-#           app.kubernetes.io/component: controller
-#         ports:
-#           - name: http
-#             port: 80
-#             targetPort: 80
-#           - name: https
-#             port: 443
-#             targetPort: 443
-#   environment:
-#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-#   run_once: true
-#   when: inventory_hostname in groups['control']
-
-# - name: Wait for EXTERNAL-IP
-#   command: >
-#     /var/lib/rancher/rke2/bin/kubectl -n kube-system get svc ingress-nginx-lb
-#     -o jsonpath='{.status.loadBalancer.ingress[*].ip}'
-#   environment:
-#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-#   register: ingress_ip
-#   until: ingress_ip.stdout | length > 0 and ingress_ip.stdout != "<pending>"
-#   retries: 40
-#   delay: 3
-#   changed_when: false
-#   run_once: true
-#   delegate_to: "{{ groups['control'][0] }}"
-
-# - debug:
-#     msg: "Ingress LB IP(s): {{ ingress_ip.stdout }}"
 

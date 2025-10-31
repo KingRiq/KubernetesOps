@@ -3,7 +3,8 @@ ansible_user: rocky9
 kubeconfig: /etc/rancher/rke2/rke2.yaml
 kube_env:
   KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-  
+
+cert_dir: "{{ mount_point }}/certs"
 rke_ports:
   - port: 53
     protocol: tcp 

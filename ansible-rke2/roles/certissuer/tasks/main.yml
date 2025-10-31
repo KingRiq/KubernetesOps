@@ -1,0 +1,81 @@
+---
+# Put values on manager node for quick testing and rollingforward strats
+- name: Copy ClusterIssuer template to remote source
+  template:
+    src: clusterissuer.yml.j2
+    dest: /tmp/clusterissuer.yml
+
+# Depending on args our CA will be let's encrypt or Galaxia
+- name: Ensure CA directory exists
+  ansible.builtin.file:
+    path: "{{ cert_dir }}"
+    state: directory
+    mode: '0777'
+
+- name: Check if certificate file exists
+  stat:
+    path: "{{ ca_crt }}"
+  register: crt_file
+
+- name: Check if key file exists
+  stat:
+    path: "{{ ca_key }}"
+  register: key_file
+
+- block:
+    - name: Generate CA private key if it doesn’t exist
+      ansible.builtin.command: >
+        openssl genrsa -out {{ ca_key }} 4096
+      args:
+        creates: "{{ ca_key }}"
+      register: gen_key
+
+    - name: Generate self-signed CA certificate if it doesn’t exist
+      ansible.builtin.command: >
+        openssl req -x509 -new -nodes
+        -key {{ ca_key }}
+        -sha256
+        -days 3650
+        -subj "{{ ca_subject }}"
+        -out {{ ca_crt }}
+      args:
+        creates: "{{ ca_crt }}"
+      register: gen_cert
+
+    - name: Verify CA cert was created
+      ansible.builtin.stat:
+        path: "{{ ca_crt }}"
+      register: ca_crt_stat
+
+    - name: Debug CA certificate info
+      ansible.builtin.command: >
+        openssl x509 -in {{ ca_crt }} -noout -subject -issuer -dates
+      when: ca_crt_stat.stat.exists
+      register: ca_info
+      changed_when: false
+
+    - name: Show CA info summary
+      ansible.builtin.debug:
+        msg: "{{ ca_info.stdout_lines | default(['CA not found']) }}"
+
+# if self_signed is true but certfiles exist there is no need to create a CA
+  when: "self_signed == 'true' and (not crt_file.stat.exists or not key_file.stat.exists)"
+
+- name: Create TLS secret using kubectl
+  ansible.builtin.command: >
+    /var/lib/rancher/rke2/bin/kubectl create secret tls galaxia-ca-secret
+    --cert="{{ ca_crt }}"
+    --key="{{ ca_key }}"
+    -n cert-manager
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  failed_when: false
+  # do not create the CA if we did not want a self signed one or we don't have the files to do it... but do so if we created one because it totally makes sense to do it if we did
+  when: ((crt_file.stat.exists and key_file.stat.exists) or ca_crt_stat.stat.exists) and (self_signed == 'true')
+
+- name: Apply ClusterIssuer template
+  delegate_to: control-plane
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition: "{{ lookup('template', 'clusterissuer.yml.j2') }}"

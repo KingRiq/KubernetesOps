@@ -8,6 +8,13 @@ mariadb:
     database: nextcloud
 
   primary:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
     persistence:
       enabled: true
       existingClaim: nextcloud-mariadb   # <-- must match the PVC you created in Ansible
@@ -31,13 +38,7 @@ nextcloud:
     secretName: nextcloud-secrets
     usernameKey: username
     passwordKey: password
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: 1000m
-      memory: 1Gi
+  
   trustedDomains:             
     - 192.168.0.222
     - cloud.chaoscauldron.space
@@ -126,7 +127,22 @@ redis:
       existingClaim: "nextcloud-redis"  
     configuration: |
       loglevel verbose
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
 
 global:
   security:
     allowInsecureImages: true
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2
+    memory: 2Gi

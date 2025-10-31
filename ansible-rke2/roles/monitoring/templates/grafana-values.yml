@@ -1,0 +1,54 @@
+admin:
+  existingSecret: generic-secrets
+  userKey: adminUser
+  passwordKey: adminPassword
+persistence:
+  enabled: true
+  existingClaim: grafana-data
+  accessModes:
+    - ReadWriteOnce
+  size: 5Gi
+  storageClassName: nfs-rwo
+
+service:
+  type: LoadBalancer
+  loadBalancerIP: {{ grafana_lb_ip }}
+  port: 80
+
+# resources:
+#   requests:
+#     cpu: 250m
+#     memory: 512Mi
+#   limits:
+#     cpu: 1
+#     memory: 1Gi
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+        access: proxy
+        isDefault: true
+
+dashboardsProvider:
+  enabled: true
+
+dashboardsConfigMaps: {}
+
+dashboards:
+  default:
+    kubernetes-cluster:
+      gnetId: 315        # Kubernetes Cluster Monitoring (by Grafana Labs)
+      revision: 1
+      datasource: Prometheus
+    nodes:
+      gnetId: 1860       # Node Exporter Full
+      revision: 29
+      datasource: Prometheus
+    pods:
+      gnetId: 6417       # Pod Metrics Dashboard
+      revision: 1
+      datasource: Prometheus

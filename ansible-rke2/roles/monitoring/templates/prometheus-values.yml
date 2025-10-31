@@ -1,0 +1,40 @@
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    retentionSize: 10GB
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    enableAdminAPI: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    # resources:
+    #   requests:
+    #     cpu: 500m
+    #     memory: 1Gi
+    #   limits:
+    #     cpu: 1
+    #     memory: 2Gi
+  storageSpec:
+        volumeClaimTemplate:
+          spec:
+            selector:
+              matchLabels:
+                app: prometheus-data       # 👈 must match your PVC label
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi            # still required for schema validity
+            storageClassName: nfs-rwo
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true

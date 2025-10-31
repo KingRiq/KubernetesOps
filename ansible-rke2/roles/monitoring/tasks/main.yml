@@ -1,0 +1,6 @@
+---
+- include_tasks: deploy_monitoring.yml
+  when: state == 'present'
+
+- include_tasks: uninstall_nextcloud.yml
+  when: state == 'absent'

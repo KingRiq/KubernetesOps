@@ -1,0 +1,6 @@
+grafana_namespace: monitoring
+grafana_release: grafana
+grafana_chart: grafana/grafana
+grafana_version: ""
+grafana_storage_size: 5Gi
+grafana_lb_ip: 192.168.0.241

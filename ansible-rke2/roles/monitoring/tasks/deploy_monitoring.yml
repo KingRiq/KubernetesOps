@@ -1,0 +1,93 @@
+
+- name: Add Grafana Helm repo
+  command: helm repo add grafana https://grafana.github.io/helm-charts
+
+- name: Add Prometheus Helm repo
+  command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+- name: Update Helm repos
+  command: helm repo update
+
+- name: Copy Grafana values.yaml from template directory
+  template:
+    src: grafana-values.yml
+    dest: /tmp/grafana-values.yml
+
+- name: Copy Prometheus values.yaml from template directory
+  template:
+    src: prometheus-values.yml
+    dest: /tmp/prometheus-values.yml
+
+- include_role:
+    name: kube_namespaces
+  vars: 
+    namespace: "{{ grafana_namespace }}"
+
+- include_role:
+    name: kube_pvcs
+  vars:
+    namespace: "{{ grafana_namespace }}"
+    pvc_list:
+      - pvc_name: grafana-data
+        storage: 5Gi
+        storage_class: nfs-rwo
+        multi_node_access: true
+
+- include_role:
+    name: kube_pvcs
+  vars:
+    namespace: "{{ grafana_namespace }}"
+    pvc_list:
+      - pvc_name: prometheus-data
+        storage: 10Gi
+        storage_class: nfs-rwo
+        multi_node_access: true
+
+- include_role:
+    name: kube_secrets
+  vars:
+    secret_namespace: "{{ grafana_namespace }}"
+    secret_name: generic-secrets
+    secret_data: "{{ generic_secrets }}"
+    
+# - name: Scale down Grafana deployment to 0 replicas
+#   kubernetes.core.k8s_scale:
+#     api_version: apps/v1
+#     kind: Deployment
+#     namespace: "{{ nextcloud_namespace }}"
+#     name: nextcloud
+#     replicas: 0
+#     kubeconfig: /etc/rancher/rke2/rke2.yaml
+#   ignore_errors: yes
+
+- name: Deploy Grafana with Helm
+  command: >
+    helm upgrade --install grafana grafana/grafana --namespace "{{ grafana_namespace }}" -f /tmp/grafana-values.yml
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+
+- name: Deploy Prometheus with Helm
+  command: >
+    helm upgrade --install prometheus prometheus-community/kube-prometheus-stack
+    --namespace "{{ grafana_namespace }}"
+    -f /tmp/prometheus-values.yml
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+
+- name: Copy Grafana Virtual Service from template directory
+  template:
+    src: grafana-vs.yml
+    dest: /tmp/grafana-vs.yml
+
+- name: Apply Grafana VirtualService
+  delegate_to: control-plane
+  become: true
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition: "{{ lookup('template', 'grafana-vs.yml') }}"
+
+# - name: Wait for Nextcloud pod to be ready
+#   command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=nextcloud -n nextcloud --timeout=300s
+#   environment:
+#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
