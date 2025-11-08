@@ -6,8 +6,26 @@
       cluster-dns: 10.43.0.10
     mode: '0755'
   when: inventory_hostname in groups['control']
-      # enable-servicelb: true
 
+
+- name: Stage NGINX config before starting rke2
+  file:
+    path: /var/lib/rancher/rke2/server/manifests/
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0775') }}"
+  when: inventory_hostname in groups['control']
+
+- name: Ensure NGINX ingress config is applied
+  ansible.builtin.template:
+    src: templates/rke2-ingress-nginx-config.yaml.j2
+    dest: /var/lib/rancher/rke2/server/manifests/rke2-ingress-nginx-config.yaml
+    owner: root
+    group: root
+    mode: '0644'
+  when: inventory_hostname in groups['control']
+  
 - name: Enable the rke2-server
   systemd:
     name: rke2-server

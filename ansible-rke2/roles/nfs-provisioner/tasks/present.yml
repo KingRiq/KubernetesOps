@@ -5,19 +5,19 @@
     namespace: "{{ nfs_namespace }}"
 
 - name: Deploy NFS provisioner
-  environment: "{{kube_env}}"
+  environment: "{{ kube_env }}"
   kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('template', 'nfs-provisioner-deploy.yaml.j2') }}"
 
 - name: Create NFS StorageClass
-  environment: "{{kube_env}}"
+  environment: "{{ kube_env }}"
   kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('template', 'storageClass.yaml.j2') }}"
 
 - name: Create NFS Service Account
-  environment: "{{kube_env}}"
+  environment: "{{ kube_env }}"
   kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('template', 'serviceaccount.yaml.j2') }}"

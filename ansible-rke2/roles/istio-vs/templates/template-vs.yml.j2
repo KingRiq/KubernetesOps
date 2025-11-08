@@ -1,0 +1,23 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: {{ service }}-vs
+  namespace: networking
+spec:
+  hosts:
+    - {{ service }}.chaoscauldron.space
+  gateways:
+    - networking/galaxia-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: {{ service }}.{{ service_namespace }}.svc.cluster.local
+            port:
+              number: 80
+      headers:
+        request:
+          set:
+            x-forwarded-proto: https

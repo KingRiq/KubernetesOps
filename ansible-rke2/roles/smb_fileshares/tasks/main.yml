@@ -1,0 +1,6 @@
+---
+- include_tasks: create_smb_shares.yml
+  when: state == 'present'
+
+- include_tasks: remove_smb_shares.yml
+  when: state == 'absent'

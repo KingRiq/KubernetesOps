@@ -1,1 +1,2 @@
-idk: idk
+service: rancher
+service_namespace: cattle-system

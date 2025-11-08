@@ -87,10 +87,6 @@ service:
 ingress:
   enabled: false
 
-# force Nextcloud to always run on worker1
-nodeSelector:
-  kubernetes.io/hostname: worker1
-
 externalDatabase:
   enabled: true
   type: mysql
@@ -141,8 +137,8 @@ global:
 
 resources:
   requests:
-    cpu: 500m
+    cpu: 200m
     memory: 1Gi
   limits:
-    cpu: 2
+    cpu: 1
     memory: 2Gi

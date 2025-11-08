@@ -1,17 +1,32 @@
 {% for sc in storage_classes %}
+{% if sc.name != "external-host" %}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: {{ sc.name }}
-provisioner: k8s-sigs.io/{{ nfs_provisioner_name }}
+provisioner: {{ nfs_provisioner_name }}
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
-provisioner: {{ nfs_provisioner_name }}
 parameters:
-  pathPattern: "${.PVC.labels.dir}"
+  pathPattern: "/Galactic_Kingdom/${.PVC.namespace}/${.PVC.labels.dir}"
   onDelete: retain            # never delete dirs
   archiveOnDelete: "false"    # never rename dirs
 mountOptions:
   - vers=4.1
+{% else %}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ sc.name }}
+provisioner: {{ nfs_provisioner_name }}
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  pathPattern: "${.PVC.labels.dir}"
+  onDelete: retain            
+  archiveOnDelete: "false"    
+mountOptions:
+  - vers=4.1
+{% endif %}
 ---
 {% endfor %}

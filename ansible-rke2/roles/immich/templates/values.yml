@@ -5,31 +5,27 @@ controllers:
     containers:
       main:
         image:
-          tag: v2.1.0
+          tag: release
         env:
           REDIS_HOSTNAME: immich-valkey
           # REDIS_HOST: immich-valkey
           REDIS_PORT: 6379
           IMMICH_MACHINE_LEARNING_URL: http://ml.chaoscauldron.space
-          DB_USERNAME: immich
-          DB_DATABASE_NAME: immich_db
           DB_HOSTNAME: immich-postgresql.immich.svc.cluster.local
           DB_PORT: 5432
           UPLOAD_LOCATION: /data/immich-data
-          DB_PASSWORD: securepassword
+        envFrom:
+          - secretRef:
+              name: immich-secrets
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
 
 immich:
-  image:
-    repository: ghcr.io/immich-app/immich-server
-    tag: v1.112.1 # change to latest stable
-    pullPolicy: IfNotPresent
-  service:
-    type: LoadBalancer
-    port: "80"
-    targetPort: "80"
-    loadBalancerIP: 192.168.0.223
-
-
   persistence:
     library:
       enabled: true
@@ -37,76 +33,46 @@ immich:
       globalMounts:
         - path: /usr/src/app/upload
   
-         
-env:
-  # Database
-  DB_HOST: immich-postgresql.immich.svc.cluster.local
-  DB_PORT: "5432"
-
-  # Redis
-  REDIS_HOST: immich-valkey
-  REDIS_PORT: "6379"
-
-  # REDIS_HOSTNAME: 
-  # DB_HOSTNAME: immich-postgresql
-
-  DB_USERNAME: immich
-  DB_DATABASE_NAME: immich_db
-  # -- You should provide your own secret outside of this helm-chart and use `postgresql.global.postgresql.auth.existingSecret` to provide credentials to the postgresql instance
-  DB_PASSWORD: securepassword
-  IMMICH_MACHINE_LEARNING_URL: http://ml.chaoscauldron.space
-
-image:
-
-    # Machine learning worker paths
-    MACHINE_LEARNING_URL: http://ml.chaoscauldron.space
-
-    # Upload location inside the PVC
-    UPLOAD_LOCATION: /data/immich-data
-
-  # ingress:
-  #   enabled: true
-  #   className: nginx
-  #   annotations:
-  #     kubernetes.io/ingress.class: nginx
-  #   hosts:
-  #     - host: immich.local     # change to your domain
-  #       paths:
-  #         - path: /
-  #           pathType: Prefix
-  #   tls: [] # add cert-manager secret if you want HTTPS
-
-# You MUST pin an app version; chart doesn’t track every release.
-
-
-
 externalDatabase:
   enabled: true
   host: immich-postgresql.immich.svc.cluster.local
   port: 5432
-  user: immich
-  password: securepassword
-  database: immich_db
+  existingSecret: generic_secrets
 
 
 valkey:
   enabled: true
-  architecture: standalone
-  master:
-    persistence:
+  controllers:
+    main:
+      containers:
+        main:
+            image:
+              repository: docker.io/valkey/valkey
+              tag: 8.1-alpine
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 300m
+                memory: 256Mi
+  persistence:
+    data:
       enabled: false
-  image:
-    registry: docker.io/
-    repository: valkey/valkey
-    tag: 8.1-alpine
-
 
 machine-learning:
   enabled: true
-  image:
-    repository: ghcr.io/immich-app/immich-machine-learning
-    tag: release
-    pullPolicy: IfNotPresent
+  controllers:
+    main: 
+      containers:
+        main:
+          resources:
+            requests: 
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi          
   service:
     main:
       enabled: true
@@ -124,10 +90,7 @@ machine-learning:
     cache:
       enabled: true
       size: 10Gi
-      # Optional: Set this to pvc to avoid downloading the ML models every start.
-      type: emptyDir
       existingClaim: machine-learning
-
 
 global:
   security:

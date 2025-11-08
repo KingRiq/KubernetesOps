@@ -29,8 +29,7 @@ spec:
       labels:
         app: nfs-server
     spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirst
       nodeSelector:
         kubernetes.io/hostname: {{ storage_node }}
       containers:
@@ -63,9 +62,6 @@ spec:
               mountPropagation: HostToContainer
             - name: nfs-shadow
               mountPath: /exports/Shadow_Galactica
-              mountPropagation: HostToContainer
-            - name: nfs-mariadb
-              mountPath: /exports/nextcloud-mariadb
               mountPropagation: HostToContainer
       volumes:
         - name: nfs-data
@@ -104,7 +100,7 @@ spec:
   resources:
     requests:
       storage: 1Ti
-  storageClassName: nfs-rwx
+  storageClassName: external-host
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -118,7 +114,7 @@ spec:
   resources:
     requests:
       storage: 1Ti
-  storageClassName: nfs-rwx
+  storageClassName: external-host
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -132,7 +128,7 @@ spec:
   resources:
     requests:
       storage: 100Gi
-  storageClassName: nfs-rwx
+  storageClassName: external-host
 ---
 # ================================
 # 4. Samba ConfigMap
@@ -183,8 +179,6 @@ spec:
         app: samba
     spec:
       dnsPolicy: ClusterFirst                            # no hostNetwork when using a Service
-      nodeSelector:
-        kubernetes.io/hostname: {{ storage_node }}
       containers:
         - name: samba
           image: dperson/samba:latest
@@ -214,29 +208,15 @@ spec:
             - name: smb-conf
               mountPath: /etc/samba
             - name: data
-              mountPath: /data/share                # Samba shares this path
-              mountPropagation: HostToContainer
-            - name: nextcloud-data
-              mountPath: /data/share/nextcloud-data
-            - name: artemis-host
-              mountPath: /data/share/Crystal_Tokyo
-              mountPropagation: HostToContainer
-            - name: luna-host
-              mountPath: /data/share/Silver_Millenium
-              mountPropagation: HostToContainer
-            - name: mac-host
-              mountPath: /data/share/Shadow_Galactica
-              mountPropagation: HostToContainer
-            - name: mariadb
-              mountPath: /data/share/nextcloud-mariadb
+              mountPath: /data/share                
               mountPropagation: HostToContainer
       volumes:
         - name: smb-conf
           configMap: { name: samba-config }
         - name: data
           nfs:
-            server: {{ storage_node_ip }}            # same node IP as PV
-            path: "/"          # MUST match NFS export path
+            server: {{ nfs_assigned_ip }}          
+            path: "/"
         - name: artemis-host
           hostPath:
             path: /mnt/windows/share/Crystal_Tokyo
@@ -249,14 +229,7 @@ spec:
           hostPath:
             path: /mnt/windows/share/Shadow_Galactica
             type: DirectoryOrCreate
-        - name: mariadb
-          hostPath:
-            path: /mnt/windows/share/nextcloud-mariadb
-            type: DirectoryOrCreate
-        - name: nextcloud-data
-          hostPath:
-            path: /mnt/windows/share/nextcloud-data
-            type: DirectoryOrCreate
+
 ---
 # ================================
 # 6. Services
@@ -283,7 +256,8 @@ metadata:
   name: nfs-server
   namespace: storage
 spec:
-  type: ClusterIP
+  type: LoadBalancer
+  loadBalancerIP: {{ nfs_assigned_ip }}
   selector:
     app: nfs-server
   ports:
