@@ -1,0 +1,78 @@
+# - include_role:
+#     name: kube_secrets
+#   vars:
+#     secret_namespace: immich
+#     secret_name: immich-secrets
+#     secret_data: "{{ immich_secrets }}"
+- include_role:
+    name: kube_namespaces
+  vars: 
+    namespace: "{{ argocd_namespace }}"
+
+    
+- name: Add Argocd Helm repo
+  command: helm repo add argo "{{ argocd_helm_repo }}"
+
+- name: Update Helm repos
+  command: helm repo update
+
+- name: Copy ArgoCD values.yml from template directory
+  template:
+    src: values.yml
+    dest: /tmp/argocd-values.yml
+
+# - name: Copy ArgoCD values.yaml from template directory
+#   template:
+#     src: immich-postgres.yml
+#     dest: /tmp/immich-postgres.yml
+
+
+# - name: Scale down Immich deployment to 0 replicas
+#   kubernetes.core.k8s_scale:
+#     api_version: apps/v1
+#     kind: Deployment
+#     namespace: immich
+#     name: immich
+#     replicas: 0
+#     kubeconfig: /etc/rancher/rke2/rke2.yaml
+#   ignore_errors: yes
+
+# - name: Apply Immich Postgres statefulset manifest
+#   kubernetes.core.k8s:
+#     kubeconfig: /etc/rancher/rke2/rke2.yaml
+#     state: present
+#     src: /tmp/immich-postgres.yml
+
+- name: Install/Upgrade ArgoCD Helm
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: "{{ argocd_namespace }}"
+    chart_ref: "argo/argo-cd"
+    release_namespace: "{{ argocd_namespace }}"
+    values_files:
+      - "/tmp/argocd-values.yml"
+    wait: true
+    wait_timeout: 600s
+    atomic: true
+
+# - name: Copy Immich VirtualService from template directory
+#   template:
+#     src: immich-vs.yml
+#     dest: /tmp/immich-vs.yml
+
+# - name: Apply Immich VirtualService
+#   delegate_to: control-plane
+#   become: true
+#   kubernetes.core.k8s:
+#     kubeconfig: /etc/rancher/rke2/rke2.yaml
+#     state: present
+#     definition: "{{ lookup('template', 'immich-vs.yml') }}"
+
+
+# - name: Wait for Immich pod to be ready
+#   command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=immich-server -n immich --timeout=300s
+#   environment:
+#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+
+- include_role:
+    name: istio-vs

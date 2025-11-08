@@ -1,0 +1,33 @@
+---
+# Right now the current use case is as follow:
+# A storage node will mount ALL configured drives from different machines (smb domains) to a directory on a node configured for storage 
+# this will be hosted via NFS to other resources
+# Refer to the Network Storage Protocol Diagram
+- name: Install cifs-utils package
+  package:
+    name: cifs-utils
+    state: present
+
+- name: Create mount directory
+  file:
+    path: "{{ mount_point }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+- name: Ensure mount points exist
+  file:
+    path: "{{ mount_point }}/{{ item.mount_name }}"
+    state: directory
+    mode: "0777"
+  loop: "{{ smb_domains }}"
+
+- name: Mount SMB shares
+  mount:
+    path: "{{ mount_point }}/{{ item.mount_name }}"
+    src: "{{ item.smb_share }}"
+    fstype: cifs
+    opts: "username={{ item.smb_username }},password={{ item.smb_password }},domain={{ item.domain }},vers={{ smb_version }},rw,uid=65534,gid=65534,file_mode=0777,dir_mode=0777,noperm"
+    state: mounted
+  loop: "{{ smb_domains }}"

@@ -1,0 +1,147 @@
+global:
+  image:
+    tag: v2.13.0
+  securityContext:
+    runAsNonRoot: true
+    fsGroup: 999
+
+dex:
+  enabled: true
+  service:
+    type: ClusterIP
+
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  # resources:
+  #   requests:
+  #     cpu: 50m
+  #     memory: 128Mi
+  #   limits:
+  #     cpu: 200m
+  #     memory: 256Mi
+applicationController:
+  clusterAdminAccess:
+    enabled: true   # allow the in-cluster cluster to be managed
+
+controller:
+  # serviceAccount:
+    # create: true
+    # name: argocd-application-controller
+    # automountServiceAccountToken: true
+  clusterAdminAccess:
+    enabled: true
+  replicas: 1
+  # resources:
+  #   requests:
+  #     cpu: 100m
+  #     memory: 256Mi
+  #   limits:
+  #     cpu: 500m
+  #     memory: 512Mi
+
+repoServer:
+  replicas: 1
+  # resources:
+  #   requests:
+  #     cpu: 100m
+  #     memory: 256Mi
+  #   limits:
+  #     cpu: 500m
+  #     memory: 512Mi
+
+server:
+  replicas: 1
+  service:
+    type: LoadBalancer
+    ports:
+      http: 80
+      https: 443
+  extraArgs:
+    - --insecure
+  serviceAccount:
+    create: true
+    name: argocd-server
+    annotations: {}
+    automountServiceAccountToken: true
+
+  # resources:
+  #   requests:
+  #     cpu: 100m
+  #     memory: 256Mi
+  #   limits:
+  #     cpu: 500m
+  #     memory: 512Mi
+
+
+
+
+  # resources:
+  #   requests:
+  #     cpu: 50m
+  #     memory: 128Mi
+  #   limits:
+  #     cpu: 200m
+  #     memory: 256Mi
+
+configs:
+  params:
+    create: true
+    server.insecure: true
+  cm:
+    application.instanceLabelKey: argocd.argoproj.io/instance
+    timeout.reconciliation: 180s
+  rbac:
+    create: true
+
+
+    # Arbitrary extra secrets (end up in argocd-secret)
+    extra:
+      slackToken: "xoxb-1234567890"
+      customKey: "myCustomValue"
+  clusters:
+    - name: default
+      server: https://kubernetes.default.svc
+      config:
+
+
+
+  # # Repositories (credentialTemplates make these reusable)
+  # credentialTemplates:
+  #   github-creds:
+  #     url: https://github.com/YourUser/KubernetesOps.git
+  #     username: "YourUser"
+  #     password: "ghp_yourPersonalAccessToken"
+
+  # # Optional: inline repository definitions (for private repos)
+  # repositories:
+  #   kubernetesops:
+  #     url: https://github.com/YourUser/KubernetesOps.git
+  #     type: git
+  #     name: kubernetesops
+  #     passwordSecret:
+  #       name: argocd-secret
+  #       key: githubToken
+
+  # # Optional: Cluster credentials
+  # clusters:
+  #   mycluster:
+  #     server: "https://192.168.0.100:6443"
+  #     name: "rke2"
+  #     config:
+  #       bearerToken: "REDACTED_TOKEN"
+  #       tlsClientConfig:
+  #         insecure: false
+  #         caData: "BASE64_CA_CERT"
+
+applicationSet:
+  enabled: true
+
+notifications:
+  enabled: true
+
+
+
+
+

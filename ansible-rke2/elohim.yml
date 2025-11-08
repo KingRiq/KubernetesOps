@@ -1,0 +1,16 @@
+- import_playbook: evaluate_ip.yml
+# - import_playbook: install_helm.yml
+- name: Run Immich and Nextcloud roles in parallel
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Launch Immich role playbook asynchronously
+      ansible.builtin.command: ansible-playbook -i inventory/Galaxia.yml deployImmich.yml -e state=present
+      async: 600
+      poll: 0
+      register: immich_job
+
+    - name: Launch Nextcloud role playbook asynchronously
+      ansible.builtin.command: ansible-playbook -i inventory/Galaxia.yml deployNextCloud.yml -e state=present
+      async: 600
+      poll: 0

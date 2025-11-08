@@ -6,6 +6,7 @@ storage_classes:
   - name: nfs-rwx
   - name: nfs-rwo
   - name: nfs-rox
+  - name: external-host
 
 additional_mount: ""
 additional_volumes: ""

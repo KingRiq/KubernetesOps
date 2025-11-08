@@ -1,0 +1,6 @@
+argocd_namespace: argocd
+argocd_helm_repo: https://argoproj.github.io/argo-helm
+argocd_chart_version: ""
+
+service: "{{argocd_namespace}}-server"
+service_namespace: "{{ argocd_namespace }}"

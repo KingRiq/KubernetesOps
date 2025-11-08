@@ -1,0 +1,13 @@
+---
+- name: Copy {{ service }} Virtual Service from template directory
+  template:
+    src: template-vs.yml.j2
+    dest: /tmp/{{ service }}-vs.yml
+
+- name: Apply {{ service }} VirtualService
+  delegate_to: control-plane
+  become: true
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition: "{{ lookup('template', 'template-vs.yml.j2') }}"

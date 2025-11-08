@@ -55,7 +55,6 @@
     mode: "{{ item.mode | default('0775') }}"
   loop:
     - { path: "{{ storage_host_path }}", mode: "0777" }
-    - { path: "{{ next_cloud_storage_path }}", mode: "0755" }
   when: inventory_hostname == storage_node
 
 - name: Remove old samba deployment if exists
@@ -116,7 +115,7 @@
 - name: Mount NFS export from "{{ storage_node }}"
   mount:
     path: /mnt/windows/share
-    src: "{{ storage_node_ip }}:/"
+    src: "{{ nfs_assigned_ip }}:/"
     fstype: nfs
     opts: "vers=4,rw,_netdev"
     state: mounted

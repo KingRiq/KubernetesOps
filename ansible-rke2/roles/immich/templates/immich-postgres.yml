@@ -41,11 +41,20 @@ spec:
         - containerPort: 5432
         env:
         - name: POSTGRES_DB
-          value: immich_db
+          valueFrom: 
+            secretKeyRef: 
+              name: immich-secrets
+              key: DB_DATABASE_NAME
         - name: POSTGRES_USER
-          value: immich
+          valueFrom: 
+            secretKeyRef: 
+              name: immich-secrets
+              key: DB_USERNAME
         - name: POSTGRES_PASSWORD
-          value: securepassword
+          valueFrom:
+            secretKeyRef: 
+              name: immich-secrets
+              key: DB_PASSWORD
         volumeMounts:
         - name: postgres-data
           mountPath: /var/lib/postgresql/data

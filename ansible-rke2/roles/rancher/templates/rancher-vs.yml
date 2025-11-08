@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: rancher-vs
+  namespace: networking
+spec:
+  hosts:
+    - rancher.chaoscauldron.space
+  gateways:
+    - networking/galaxia-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: rancher.cattle-system.svc.cluster.local
+            port:
+              number: 80

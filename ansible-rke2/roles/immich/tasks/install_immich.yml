@@ -1,13 +1,15 @@
-# - include_role:
-#     name: kube_secrets
-#   vars:
-#     secret_namespace: immich
-#     secret_name: immich-secrets
-#     secret_data: "{{ immich_secrets }}"
+    
 - include_role:
     name: kube_namespaces
   vars: 
     namespace: immich
+
+- include_role:
+    name: kube_secrets
+  vars:
+    secret_namespace: immich
+    secret_name: immich-secrets
+    secret_data: "{{ generic_secrets }}"
 
 - include_role:
     name: kube_pvcs
@@ -93,7 +95,7 @@
     state: present
     definition: "{{ lookup('template', 'machine-vs.yml') }}"
 
-- name: Wait for Immich pod to be ready
-  command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=immich-server -n immich --timeout=300s
-  environment:
-    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+# - name: Wait for Immich pod to be ready
+#   command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=immich-server -n immich --timeout=300s
+#   environment:
+#     KUBECONFIG: /etc/rancher/rke2/rke2.yaml

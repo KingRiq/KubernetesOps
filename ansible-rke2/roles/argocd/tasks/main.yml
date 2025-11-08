@@ -1,0 +1,6 @@
+---
+- include_tasks: install_argocd.yml
+  when: state == 'present'
+
+- include_tasks: uninstall_argocd.yml
+  when: state == 'absent'

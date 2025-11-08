@@ -46,3 +46,7 @@
     force: true
     values_files:
       - /tmp/rancher-values.yml
+
+- include_role:
+    name: istio-vs
+

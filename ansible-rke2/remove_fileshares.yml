@@ -17,7 +17,7 @@
       mount:
         path: "{{ mount_point }}"
         fstype: "{{ fstype }}"
-        state: absent
+        state: absent_from_fstab
 
     # - name: Remove mount directory
     #   file:

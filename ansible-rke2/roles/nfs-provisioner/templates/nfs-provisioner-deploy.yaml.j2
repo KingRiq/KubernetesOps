@@ -24,11 +24,12 @@ spec:
             - name: PROVISIONER_NAME
               value: {{ nfs_provisioner_name }}     
             - name: NFS_SERVER
-              value: {{ storage_node_ip }}
+              value: {{ nfs_assigned_ip }}
             - name: NFS_PATH
               value: /
       volumes:
         - name: nfs-client-root
           nfs:
-            server: {{ storage_node_ip }}
+            server: {{ nfs_assigned_ip }}
             path: /
+# ACTUALLY connect to the NFS POD nfs and not my physical machine

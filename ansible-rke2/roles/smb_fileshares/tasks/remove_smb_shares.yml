@@ -1,0 +1,12 @@
+---
+- name: Unmount the SMB share if mounted
+  mount:
+    path: "{{ mount_point }}"
+    fstype: "{{ fstype }}"
+    state: unmounted
+
+- name: Remove fstab entry (if it exists)
+  mount:
+    path: "{{ mount_point }}"
+    fstype: "{{ fstype }}"
+    state: absent_from_fstab

@@ -1,6 +1,7 @@
 storage_node_ip: "{{ hostvars[storage_node].external_address.ip }}"
 manifest_remote_path: "/tmp/storage.yaml"
-samba_assigned_ip: 102.168.0.235
+samba_assigned_ip: 192.168.0.235
+nfs_assigned_ip: 192.168.0.236
 share_path: /mnt/windows/share
 nfs_export_path: /exports
 nfs_ports:

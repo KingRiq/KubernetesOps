@@ -11,6 +11,10 @@
   tags:
     - active
 
+- import_playbook: install_helm.yml
+  tags:
+    - active
+
 - name: "{{ state }}ing RKE2 nodes "
   hosts: ClusterGroup
   become: true
@@ -29,31 +33,10 @@
       tags:
         - metallb
 
-- name: Deploy NFS Provisioner
-  hosts: control
-  gather_facts: false
-  become: true
-  roles:
-    - role: nfs-provisioner
-      when: state == 'present'
-      tags:
-        - nfs
-
 - import_playbook: deploy_storage.yml
   tags:
     - nfs
   when: state == 'present'
-
-- import_playbook: configure_fileshares.yml
-  tags:
-    - nfs
-  when: state == 'present'
-
-
-- import_playbook: remove_fileshares.yml
-  tags:
-    - nfs
-  when: state == 'absent'
 
 - name: Deploy Istio
   hosts: control
@@ -75,12 +58,55 @@
       tags:
         - certs
 
+- name: Deploy NFS Provisioner
+  hosts: control
+  gather_facts: false
+  become: true
+  roles:
+    - role: nfs-provisioner
+      when: state == 'present'
+      tags:
+        - nfs
+
+
+
+# - name: Deploy SMB Shares to Storage Node
+#   hosts: ClusterGroup
+#   gather_facts: false
+#   become: true
+#   roles:
+#     - role: smb_fileshares
+#       when: state == 'present'
+#       tags:
+#         - smb
+
+
 - name: Deploy Rancher 
   hosts: control
   gather_facts: false
   become: true
   roles:
     - role: rancher
+      when: state == 'present'
+      tags:
+        - rancher
+
+- name: Deploy Rancher 
+  hosts: control
+  gather_facts: false
+  become: true
+  roles:
+    - role: nextcloud
+      when: state == 'present'
+      tags:
+        - rancher
+
+- name: Deploy Rancher 
+  hosts: control
+  gather_facts: false
+  become: true
+  roles:
+    - role: immich
       when: state == 'present'
       tags:
         - rancher
