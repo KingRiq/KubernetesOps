@@ -5,7 +5,7 @@ controllers:
     containers:
       main:
         image:
-          tag: v2.0.0
+          tag: release
         env:
           REDIS_HOSTNAME: immich-valkey
           # REDIS_HOST: immich-valkey
@@ -102,7 +102,7 @@ server:
   enabled: true
   image:
     repository: ghcr.io/immich-app/immich-server
-    tag: v2.0.0
+    tag: release
     pullPolicy: IfNotPresent
   service:
     main:
