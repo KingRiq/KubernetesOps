@@ -104,6 +104,11 @@ configs:
     - name: default
       server: https://kubernetes.default.svc
       config:
+  repositories:
+    my-public-repo:
+      type: git
+      name: KubernetesOps
+      url: https://github.com/KingRiq/KubernetesOps.git
 
 
 
