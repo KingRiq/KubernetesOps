@@ -5,7 +5,7 @@ controllers:
     containers:
       main:
         image:
-          tag: release
+          tag: v2.0.0
         env:
           REDIS_HOSTNAME: immich-valkey
           # REDIS_HOST: immich-valkey
