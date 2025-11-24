@@ -40,11 +40,16 @@
   template:
     src: values.yml
     dest: /tmp/immich-values.yml
+  
 
 - name: Copy Immich values.yaml from template directory
   template:
     src: immich-postgres.yml
     dest: /tmp/immich-postgres.yml
+  delegate_to: "{{ item }}"
+  loop: 
+    - 'control-plane'
+    - 'localhost'
 
 
 - name: Scale down Immich deployment to 0 replicas
@@ -63,16 +68,15 @@
     state: present
     src: /tmp/immich-postgres.yml
 
-- name: Deploy Immich with Helm
-  command: >
-    helm upgrade --install immich immich/immich --namespace immich -f /tmp/immich-values.yml
-  environment:
-    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-
 - name: Copy Immich VirtualService from template directory
   template:
     src: immich-vs.yml
     dest: /tmp/immich-vs.yml
+  delegate_to: "{{ item }}"
+  loop: 
+    - 'control-plane'
+    - 'localhost'
+
 
 - name: Apply Immich VirtualService
   delegate_to: control-plane
@@ -86,6 +90,10 @@
   template:
     src: machine-vs.yml
     dest: /tmp/machine-vs.yml
+  delegate_to: "{{ item }}"
+  loop: 
+    - 'control-plane'
+    - 'localhost'
 
 - name: Apply Immich VirtualService
   delegate_to: control-plane
@@ -94,6 +102,13 @@
     kubeconfig: /etc/rancher/rke2/rke2.yaml
     state: present
     definition: "{{ lookup('template', 'machine-vs.yml') }}"
+
+- name: Deploy Immich with Helm
+  command: >
+    helm upgrade --install immich immich/immich --namespace immich -f /tmp/immich-values.yml
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+
 
 # - name: Wait for Immich pod to be ready
 #   command: /var/lib/rancher/rke2/bin/kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=immich-server -n immich --timeout=300s

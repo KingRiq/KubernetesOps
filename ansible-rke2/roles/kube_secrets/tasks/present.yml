@@ -3,12 +3,17 @@
   template:
     src: templates/k8s-secret.yml.j2
     dest: /tmp/{{ secret_name }}.yml
+  delegate_to: "{{ item }}"
+  loop: 
+    - 'control-plane'
+    - 'localhost'
 
 - name: Apply Kubernetes secret
   environment: "{{kube_env}}"
   kubernetes.core.k8s:
     state: present
     src: /tmp/{{ secret_name }}.yml
+
 
 - name: Delete rendered manifest for security
   file:

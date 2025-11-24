@@ -21,6 +21,11 @@
     src: values.yml
     dest: /tmp/argocd-values.yml
 
+- name: Copy Argo Apps values.yml from template directory
+  template:
+    src: core-applications.yml
+    dest: /tmp/core-applications.yml
+
 # - name: Copy ArgoCD values.yaml from template directory
 #   template:
 #     src: immich-postgres.yml
@@ -55,6 +60,17 @@
     wait_timeout: 600s
     atomic: true
 
+- name: Install/Upgrade Argo Apps Helm
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: "argocd-apps"
+    chart_ref: "argo/argocd-apps"
+    release_namespace: "{{ argocd_namespace }}"
+    values_files:
+      - "/tmp/core-applications.yml"
+    wait: true
+    wait_timeout: 600s
+    atomic: true
 # - name: Copy Immich VirtualService from template directory
 #   template:
 #     src: immich-vs.yml
@@ -74,5 +90,5 @@
 #   environment:
 #     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
 
-- include_role:
-    name: istio-vs
+# - include_role:
+#     name: istio-vs

@@ -54,20 +54,6 @@
     values_files:
       - "/tmp/values-istiod.yml"
 
-# - name: Wait for istiod Ready (verify reality, not just Helm)
-#   kubernetes.core.k8s_info:
-#     kubeconfig: "{{ k8s_kubeconfig }}"
-#     api_version: apps/v1
-#     kind: Deployment
-#     namespace: istio-system
-#     name: istiod
-#   register: istiod_dep
-#   until: (istiod_dep.resources|length>0) and ((istiod_dep.resources[0].status.readyReplicas|default(0))>0)
-#   retries: 24
-#   delay: 10
-#   delay: 10
-
-
 - name: Ensure istio-ingress namespace exists
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
@@ -78,10 +64,32 @@
       metadata: 
         name: istio-ingress
 
+- name: Ensure egress namespace exists
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata: 
+        name: istio-egress
 - name: Copy ingressgateway from template directory
   template:
     src: values-ingressgateway.yml
     dest: /tmp/values-ingressgateway.yml
+  delegate_to: "{{ item }}"
+  loop: 
+    - 'control-plane'
+    - 'localhost'
+
+- name: Copy egressgateway from template directory
+  template:
+    src: values-egressgateway.yml
+    dest: /tmp/values-egressgateway.yml
+  delegate_to: "{{ item }}"
+  loop: 
+    - 'control-plane'
+    - 'localhost'
 
 - name: Install/Upgrade ingress gateway
   kubernetes.core.helm:
@@ -94,6 +102,19 @@
     wait: true
     wait_timeout: 600s
     atomic: true
+
+- name: Install/Upgrade egress gateway
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: istio-egress
+    chart_ref: istio/gateway
+    release_namespace: istio-egress
+    values_files:
+      - "/tmp/values-egressgateway.yml"
+    wait: true
+    wait_timeout: 600s
+    atomic: true
+
 
 - name: Copy Default gateway from template directory
   template:

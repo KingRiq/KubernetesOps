@@ -3,6 +3,10 @@
   template:
     src: template-vs.yml.j2
     dest: /tmp/{{ service }}-vs.yml
+  delegate_to: "{{ item }}"
+  loop:
+   - 'control-plane'
+   - 'localhost'
 
 - name: Apply {{ service }} VirtualService
   delegate_to: control-plane
