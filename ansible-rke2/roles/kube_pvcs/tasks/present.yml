@@ -1,21 +1,24 @@
+- name: Copy pvc from template directory
+  template:
+    src: template-pvc.yaml.j2
+    dest: /tmp/{{ item.pvc_name }}-pvc.yml
+  delegate_to: control-plane
+  loop:
+    "{{ pvc_list }}"
+
+- name: Copy pvc from template directory
+  template:
+    src: template-pvc.yaml.j2
+    dest: /tmp/{{ item.pvc_name }}-pvc.yml
+  delegate_to: localhost
+  loop:
+    "{{ pvc_list }}"
+
+
 - name: Create PersistentVolumeClaim (PVC)
   environment: "{{kube_env}}"
   k8s:
     state: present
-    definition:
-      apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
-        name: "{{ item.pvc_name }}"
-        namespace: "{{ namespace }}"
-        labels:
-          dir: "{{ item.pvc_name }}"
-      spec:
-        accessModes:
-          - "{{ 'ReadWriteMany' if item.multi_node_access else 'ReadWriteOnce' }}"
-        resources:
-          requests:
-            storage: "{{ item.storage }}"
-        storageClassName: "{{ item.storage_class }}"  # replace with your storage class
+    src: /tmp/{{item.pvc_name }}-pvc.yml
   loop:
     "{{ pvc_list }}"

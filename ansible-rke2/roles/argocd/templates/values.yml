@@ -55,6 +55,7 @@ server:
   replicas: 1
   service:
     type: LoadBalancer
+    loadBalancerIP: 192.168.0.203
     ports:
       http: 80
       https: 443
@@ -94,21 +95,26 @@ configs:
     timeout.reconciliation: 180s
   rbac:
     create: true
-
-
-    # Arbitrary extra secrets (end up in argocd-secret)
-    extra:
-      slackToken: "xoxb-1234567890"
-      customKey: "myCustomValue"
+  
+  secret:
+    # Optional: override admin password (bcrypt hash)
+    # You can generate this with: htpasswd -nbBC 10 "" "mypassword" | tr -d ':\n'
+    argocdServerAdminPassword: "$2y$10$nykrgqeG8LK9lF3sfww34uItwvc8Oz29DRaolWahzEOBSy7y3VEN2"
   clusters:
     - name: default
       server: https://kubernetes.default.svc
       config:
   repositories:
-    my-public-repo:
+    kubernetesops:
       type: git
-      name: KubernetesOps
+      name: kubernetesops
       url: https://github.com/KingRiq/KubernetesOps.git
+    coreapplications:
+      type: git
+      name: coreapplications
+      url: https://github.com/KingRiq/CoreApplications.git
+      username: KingRiq
+      password: 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
 
 
 

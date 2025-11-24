@@ -19,6 +19,12 @@
     mode: "0644"
   delegate_to: control-plane
 
+- name: Copy manifest to somewhere for repos
+  ansible.builtin.copy:
+    content: "{{ rendered_manifest }}"
+    dest: "{{ manifest_remote_path }}"
+    mode: "0644"
+  delegate_to: localhost
 # this does the same thing as above but will copy everything to every string since i pass in cluster group
 # - name: Copy template to host
 #   template:

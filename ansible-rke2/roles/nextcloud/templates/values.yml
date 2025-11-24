@@ -15,13 +15,16 @@ mariadb:
       limits:
         cpu: 500m
         memory: 512Mi
+# TODO verify against bitnami chart that persistence here is correct we could be setting up
+# It may be sufficient since we are declaring our own pvcs to just do that but if we can we can just set it up via this chart
+# and I can delete some code
     persistence:
       enabled: true
       existingClaim: nextcloud-mariadb   # <-- must match the PVC you created in Ansible
       accessModes:
         - ReadWriteOnce
       size: 50Gi             # Helm chart still needs a size, but your PVC spec wins
-      storageClass: "rwo"       # blank since we’re binding manually
+      storageClass: "nfs-rwo"       # blank since we’re binding manually
   containerSecurityContext:
     runAsUser: 0
     runAsGroup: 0

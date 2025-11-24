@@ -5,11 +5,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: storage
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: storage
+  labels:
+    argocd.argoproj.io/instance: nfs
 ---
 # ================================
 # 2. NFS Server Deployment
@@ -19,6 +16,8 @@ kind: Deployment
 metadata:
   name: nfs-server
   namespace: storage
+  labels:
+    argocd.argoproj.io/instance: nfs
 spec:
   replicas: 1
   selector:
@@ -63,6 +62,9 @@ spec:
             - name: nfs-shadow
               mountPath: /exports/Shadow_Galactica
               mountPropagation: HostToContainer
+            - name: nfs-chaos
+              mountPath: /exports/Chaos_Cauldron
+              mountPropagation: HostToContainer
       volumes:
         - name: nfs-data
           hostPath:
@@ -80,10 +82,11 @@ spec:
           hostPath:
             path: /mnt/windows/share/Shadow_Galactica
             type: DirectoryOrCreate
-        - name: nfs-mariadb
+        - name: nfs-chaos
           hostPath:
-            path: /mnt/windows/share/nextcloud-mariadb
+            path: /mnt/windows/share/Chaos_Cauldron
             type: DirectoryOrCreate
+
 ---
 # ================================
 # 3. PersistentVolumeClaims (dynamic via StorageClass)
@@ -95,6 +98,7 @@ metadata:
   namespace: storage
   labels:
     dir: Crystal_Tokyo
+    argocd.argoproj.io/instance: nfs
 spec:
   accessModes: ["ReadWriteMany"]
   resources:
@@ -109,6 +113,7 @@ metadata:
   namespace: storage
   labels:
     dir: Silver_Millenium
+    argocd.argoproj.io/instance: nfs
 spec:
   accessModes: ["ReadWriteMany"]
   resources:
@@ -138,6 +143,8 @@ kind: ConfigMap
 metadata:
   name: samba-config
   namespace: storage
+  labels:
+    argocd.argoproj.io/instance: nfs
 data:
   smb.conf: |
     [global]
@@ -168,6 +175,8 @@ kind: Deployment
 metadata:
   name: samba
   namespace: storage
+  labels:
+    argocd.argoproj.io/instance: nfs
 spec:
   replicas: 1
   selector:
@@ -239,6 +248,8 @@ kind: Service
 metadata:
   name: samba-lb
   namespace: storage
+  labels:
+    argocd.argoproj.io/instance: nfs
 spec:
   type: LoadBalancer
   loadBalancerIP: {{ samba_assigned_ip }}
@@ -255,6 +266,8 @@ kind: Service
 metadata:
   name: nfs-server
   namespace: storage
+  labels:
+    argocd.argoproj.io/instance: nfs
 spec:
   type: LoadBalancer
   loadBalancerIP: {{ nfs_assigned_ip }}

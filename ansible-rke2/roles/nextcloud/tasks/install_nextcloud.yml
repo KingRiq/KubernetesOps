@@ -46,16 +46,20 @@
     kubeconfig: /etc/rancher/rke2/rke2.yaml
   ignore_errors: yes
 
+- name: Copy Nextcloud Virtual Service from template directory
+  template:
+    src: nextcloud-vs.yml
+    dest: /tmp/nextcloud-vs.yml
+  delegate_to: "{{ item }}"
+  loop: 
+    - 'control-plane'
+    - 'localhost'
+
 - name: Deploy Nextcloud with Helm
   command: >
     helm upgrade --install nextcloud nextcloud/nextcloud --namespace "{{ nextcloud_namespace }}" -f /tmp/nextcloud-values.yaml
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-
-- name: Copy Nextcloud Virtual Service from template directory
-  template:
-    src: nextcloud-vs.yml
-    dest: /tmp/nextcloud-vs.yml
 
 - name: Apply Nextcloud VirtualService
   delegate_to: control-plane

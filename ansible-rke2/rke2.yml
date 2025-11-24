@@ -32,21 +32,21 @@
       when: state == 'present'
       tags:
         - metallb
-
+        
 - import_playbook: deploy_storage.yml
   tags:
     - nfs
   when: state == 'present'
 
-- name: Deploy Istio
+- name: Deploy Argo CD
   hosts: control
   gather_facts: false
   become: true
   roles:
-    - role: istio
+    - role: argocd
       when: state == 'present'
       tags:
-        - istio
+        - argocd
 
 - name: Deploy Certmanager
   hosts: control
@@ -58,27 +58,38 @@
       tags:
         - certs
 
-- name: Deploy NFS Provisioner
-  hosts: control
-  gather_facts: false
-  become: true
-  roles:
-    - role: nfs-provisioner
-      when: state == 'present'
-      tags:
-        - nfs
-
-
-
-# - name: Deploy SMB Shares to Storage Node
-#   hosts: ClusterGroup
+# - name: Deploy Istio
+#   hosts: control
 #   gather_facts: false
 #   become: true
 #   roles:
-#     - role: smb_fileshares
+#     - role: istio
 #       when: state == 'present'
 #       tags:
-#         - smb
+#         - istio
+
+
+# - name: Deploy NFS Provisioner
+#   hosts: control
+#   gather_facts: false
+#   become: true
+#   roles:
+#     - role: nfs-provisioner
+#       when: state == 'present'
+#       tags:
+#         - nfs
+
+
+
+# # - name: Deploy SMB Shares to Storage Node
+# #   hosts: ClusterGroup
+# #   gather_facts: false
+# #   become: true
+# #   roles:
+# #     - role: smb_fileshares
+# #       when: state == 'present'
+# #       tags:
+# #         - smb
 
 
 - name: Deploy Rancher 
@@ -91,22 +102,22 @@
       tags:
         - rancher
 
-- name: Deploy Rancher 
-  hosts: control
-  gather_facts: false
-  become: true
-  roles:
-    - role: nextcloud
-      when: state == 'present'
-      tags:
-        - rancher
+# - name: Deploy Rancher 
+#   hosts: control
+#   gather_facts: false
+#   become: true
+#   roles:
+#     - role: nextcloud
+#       when: state == 'present'
+#       tags:
+#         - rancher
 
-- name: Deploy Rancher 
-  hosts: control
-  gather_facts: false
-  become: true
-  roles:
-    - role: immich
-      when: state == 'present'
-      tags:
-        - rancher
+# - name: Deploy Rancher 
+#   hosts: control
+#   gather_facts: false
+#   become: true
+#   roles:
+#     - role: immich
+#       when: state == 'present'
+#       tags:
+#         - rancher

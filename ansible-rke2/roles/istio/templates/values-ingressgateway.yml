@@ -1,8 +1,5 @@
 service:
   type: LoadBalancer
-  # For MetalLB pools, uncomment and adjust:
-  # annotations:
-  #   metallb.universe.tf/address-pool: default
 
 # Stable names/labels make targeting simpler:
 labels:

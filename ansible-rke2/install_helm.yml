@@ -8,6 +8,7 @@
   vars: 
     helm_arch: linux-amd64
     helm_base_url: "https://get.helm.sh"
+    helm_version: "v3.15.4"  
   tasks:
     - name: Ensure required packages are present (Rocky9)
       dnf:
@@ -18,18 +19,18 @@
           - coreutils
         state: present
 
-    - name: Get latest Helm version from Github
-      shell: |
-         curl -s https://api.github.com/repos/helm/helm/releases/latest | jq -r .tag_name
-      register: latest_helm_version
+    # - name: Get latest Helm version from Github
+    #   shell: |
+    #      curl -s https://api.github.com/repos/helm/helm/releases/latest | jq -r .tag_name
+    #   register: latest_helm_version
 
-    - name: Set Helm version fact
-      set_fact:
-        helm_version: "{{ latest_helm_version.stdout }}"
+    # - name: Set Helm version fact
+    #   set_fact:
+    #     helm_version: "{{ latest_helm_version.stdout }}"
 
-    - name: debug var
-      debug:
-        var: latest_helm_version
+    # - name: debug var
+    #   debug:
+    #     var: latest_helm_version
 
     - name: Create temp directory for Helm 
       tempfile: 
