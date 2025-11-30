@@ -9,7 +9,21 @@ metadata:
     argocd.argoproj.io/instance: nfs
 ---
 # ================================
-# 2. NFS Server Deployment
+# 2. NFS ConfigMap
+# ================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nfs-exports
+  namespace: storage
+  labels:
+    argocd.argoproj.io/instance: nfs
+data:
+  exports: |
+    /exports *(rw,fsid=0,async,no_subtree_check,insecure,no_root_squash,crossmnt)
+---
+# ================================
+# 3 NFS Server Deployment
 # ================================
 apiVersion: apps/v1
 kind: Deployment
@@ -39,8 +53,6 @@ spec:
           env:
             - name: SHARED_DIRECTORY
               value: "{{ nfs_export_path }}"
-            - name: EXPORT_OPTIONS
-              value: "rw,fsid=0,async,no_subtree_check,insecure,no_root_squash,crossmnt"
           ports:
             - containerPort: 2049
               name: nfs
@@ -56,15 +68,19 @@ spec:
             - name: nfs-crystal
               mountPath: /exports/Crystal_Tokyo
               mountPropagation: HostToContainer
-            - name: nfs-silver
-              mountPath: /exports/Silver_Millenium
-              mountPropagation: HostToContainer
-            - name: nfs-shadow
-              mountPath: /exports/Shadow_Galactica
-              mountPropagation: HostToContainer
+            # - name: nfs-silver
+            #   mountPath: /exports/Silver_Millenium
+            #   mountPropagation: HostToContainer
+            # - name: nfs-shadow
+            #   mountPath: /exports/Shadow_Galactica
+            #   mountPropagation: HostToContainer
             - name: nfs-chaos
               mountPath: /exports/Chaos_Cauldron
               mountPropagation: HostToContainer
+            - name: nfs-exports-config
+              mountPath: /etc/exports   
+              subPath: exports          
+              readOnly: true
       volumes:
         - name: nfs-data
           hostPath:
@@ -74,22 +90,24 @@ spec:
           hostPath:
             path: /mnt/windows/share/Crystal_Tokyo
             type: DirectoryOrCreate
-        - name: nfs-silver
-          hostPath:
-            path: /mnt/windows/share/Silver_Millenium
-            type: DirectoryOrCreate
-        - name: nfs-shadow
-          hostPath:
-            path: /mnt/windows/share/Shadow_Galactica
-            type: DirectoryOrCreate
+#       - name: nfs-silver
+#         hostPath:
+#           path: /mnt/windows/share/Silver_Millenium
+#           type: DirectoryOrCreate
+#       - name: nfs-shadow
+#         hostPath:
+#           path: /mnt/windows/share/Shadow_Galactica
+#           type: DirectoryOrCreate
         - name: nfs-chaos
           hostPath:
             path: /mnt/windows/share/Chaos_Cauldron
             type: DirectoryOrCreate
-
+        - name: nfs-exports-config
+          configMap:
+            name: nfs-exports
 ---
 # ================================
-# 3. PersistentVolumeClaims (dynamic via StorageClass)
+# 4. PersistentVolumeClaims
 # ================================
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -136,7 +154,7 @@ spec:
   storageClassName: external-host
 ---
 # ================================
-# 4. Samba ConfigMap
+# 5. Samba ConfigMap
 # ================================
 apiVersion: v1
 kind: ConfigMap
@@ -166,6 +184,43 @@ data:
       guest ok = yes
       public = yes
       guest only = yes
+---
+# ================================
+# 5. Samba PV/PVC for latest NFS
+# ================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: samba-nfs-pv
+spec:
+  capacity:
+    storage: 8Ti
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - vers=4.1
+  nfs:
+    server: 192.168.0.236
+    path: "/"                   # for your fsid=0-on-/exports setup
+  claimRef:
+    namespace: storage
+    name: samba-nfs-pvc         # pre-bind to the PVC below (optional but nice)
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: samba-nfs-pvc
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 8Ti
+  volumeName: samba-nfs-pv       # bind specifically to that PV
+  storageClassName: ""           # important for static PVs
 ---
 # ================================
 # 5. Samba Deployment
@@ -216,16 +271,26 @@ spec:
           volumeMounts:
             - name: smb-conf
               mountPath: /etc/samba
-            - name: data
-              mountPath: /data/share                
+            # - name: data
+            #   mountPath: /data/share                
+              # mountPropagation: HostToContainer
+            - name: artemis-host
+              mountPath: /data/share/Crystal_Tokyo            
               mountPropagation: HostToContainer
+            # - name: luna-host
+            #   mountPath: /data/share/Silver_Millenium        
+            #   mountPropagation: HostToContainer
+            # - name: mac-host
+            #   mountPath: /data/share/Shadow_Galactica
+            #   mountPropagation: HostToContainer
+            # - name:  chaos-host
+            #   mountPath: /data/share/Chaos_Cauldron
+            #   mountPropagation: HostToContainer
+            - name:  nfs
+              mountPath: /data/share
       volumes:
         - name: smb-conf
           configMap: { name: samba-config }
-        - name: data
-          nfs:
-            server: {{ nfs_assigned_ip }}          
-            path: "/"
         - name: artemis-host
           hostPath:
             path: /mnt/windows/share/Crystal_Tokyo
@@ -238,6 +303,9 @@ spec:
           hostPath:
             path: /mnt/windows/share/Shadow_Galactica
             type: DirectoryOrCreate
+        - name: nfs
+          persistentVolumeClaim:
+            claimName: samba-nfs-pvc
 
 ---
 # ================================

@@ -1,0 +1,264 @@
+# values for argo/argocd-apps
+applications:
+
+  immich:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+
+    # Multi-source: Helm chart + your values repo
+    sources:
+      - repoURL: https://immich-app.github.io/immich-charts
+        chart: immich
+        targetRevision: "*"    # or pin a version
+        helm:
+          valueFiles:
+            - $values/ansible-rke2/roles/immich/templates/values.yml
+
+      - repoURL: https://github.com/KingRiq/KubernetesOps.git
+        targetRevision: main
+        ref: values
+
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/Immich
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: immich
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
+  
+  nextcloud:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+
+    # Multi-source: Helm chart + your values repo
+    sources:
+      - repoURL: https://nextcloud.github.io/helm/
+        chart: nextcloud
+        targetRevision: "*"    # or pin a version
+        helm:
+          valueFiles:
+            - $values/ansible-rke2/roles/nextcloud/templates/values.yml
+
+      - repoURL: https://github.com/KingRiq/KubernetesOps.git
+        targetRevision: main
+        ref: values
+      
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/Nextcloud
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: nextcloud
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
+
+  rancher:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+
+    # Multi-source: Helm chart + your values repo
+    sources:
+      - repoURL: https://releases.rancher.com/server-charts/stable
+        chart: rancher
+        targetRevision: "*"    # or pin a version
+        helm:
+          valueFiles:
+            - $values/ansible-rke2/roles/rancher/templates/values.yml
+
+      - repoURL: https://github.com/KingRiq/KubernetesOps.git
+        targetRevision: main
+        ref: values
+
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/Rancher
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: cattle-system
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
+  
+  istio:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+
+    # Multi-source: Helm chart + your values repo
+    sources:
+      - repoURL: https://istio-release.storage.googleapis.com/charts
+        chart: base
+        targetRevision: "*"    # or pin a version
+        helm:
+          valueFiles:
+            - $values/ansible-rke2/roles/istio/templates/values-istio-base.yml
+      
+      - repoURL: https://istio-release.storage.googleapis.com/charts
+        chart: istiod
+        targetRevision: "*"    # or pin a version
+        helm:
+          valueFiles:
+            - $values/ansible-rke2/roles/istio/templates/values-istiod.yml
+      
+      - repoURL: https://github.com/KingRiq/KubernetesOps.git
+        targetRevision: main
+        ref: values
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: istio-system
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
+  istio-ingress:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+
+    # Multi-source: Helm chart + your values repo
+    sources:
+      - repoURL: https://istio-release.storage.googleapis.com/charts
+        chart: gateway
+        targetRevision: "*"    # or pin a version
+        helm:
+          valueFiles:
+            - $values/ansible-rke2/roles/istio/templates/values-ingressgateway.yml
+
+      - repoURL: https://github.com/KingRiq/KubernetesOps.git
+        targetRevision: main
+        ref: values
+
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/Istio_Ingress
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: istio-ingress
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
+
+  nfs:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+    sources:
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/nfs_pod
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: storage
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
+
+  nfsprovisioner:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+    sources:
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/NFS_Provisioner
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: storage
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
+  jellyfin:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+    sources:
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/Jellyfin
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: media
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
+  qbittorrent:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+    sources:
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/Qbittorrent
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: media
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
+  pihole:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+    sources:
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/Pihole
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: pihole
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
