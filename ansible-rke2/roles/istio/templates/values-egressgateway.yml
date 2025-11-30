@@ -1,0 +1,11 @@
+# values-egressgateway.yml
+
+service:
+  type: ClusterIP
+
+labels:
+  istio: egressgateway
+  app: istio-egressgateway
+
+# If you had 'platform: openshift' in ingress and it works, you can add it here too:
+# platform: openshift

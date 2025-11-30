@@ -44,7 +44,7 @@
     
     - name: set fact for helm location
       set_fact: 
-        helm_package: "{{ tmp_dir.path }}/helm.tar.gz"
+        helm_package: "/tmp/helm.tar.gz"
 
     
     - name: Download Helm tarball

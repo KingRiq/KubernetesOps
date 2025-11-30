@@ -8,7 +8,7 @@ provisioner: {{ nfs_provisioner_name }}
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 parameters:
-  pathPattern: "/Galactic_Kingdom/${.PVC.namespace}/${.PVC.labels.dir}"
+  pathPattern: "/Chaos_Cauldron/Galactic_Kingdom/${.PVC.namespace}/${.PVC.labels.dir}"
   onDelete: retain            # never delete dirs
   archiveOnDelete: "false"    # never rename dirs
 mountOptions:

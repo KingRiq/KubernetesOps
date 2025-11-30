@@ -123,6 +123,6 @@
     path: /mnt/windows/share
     src: "{{ nfs_assigned_ip }}:/"
     fstype: nfs
-    opts: "vers=4,rw,_netdev"
+    opts: "vers=4,rw,_netdev,proto=tcp,hard,intr,nofail,relatime,noacl,async,rsize=32768,wsize=32768,timeo=600"
     state: mounted
   when: inventory_hostname != storage_node
