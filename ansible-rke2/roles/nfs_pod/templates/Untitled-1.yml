@@ -1,0 +1,25 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: rke2-ingress-nginx
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    controller:
+      hostNetwork: false
+      service:
+        type: LoadBalancer
+        loadBalancerIP: 192.168.0.101   # the IP you forward from your router
+      config:
+        use-forwarded-headers: "true"     # correct client IPs and HTTPS detection
+        enable-ssl-passthrough: "true"    # let Istio (or backend) terminate TLS
+        proxy-body-size: "0"              # unlimited upload size
+        client-max-body-size: "0"         # unlimited client upload size
+        proxy-request-buffering: "off"    # stream uploads, dont buffer
+        proxy-buffering: "off"            # stream responses directly
+        proxy-read-timeout: "600"         # 10-minute timeout for slow uploads
+        proxy-send-timeout: "600"
+        keep-alive: "120"                 # reuse TCP connections
+      tcp:
+        "80": "istio-ingress/istio-ingressgateway:80"
+        "443": "istio-ingress/istio-ingressgateway:443"

@@ -81,15 +81,15 @@
 
 
 
-# # - name: Deploy SMB Shares to Storage Node
-# #   hosts: ClusterGroup
-# #   gather_facts: false
-# #   become: true
-# #   roles:
-# #     - role: smb_fileshares
-# #       when: state == 'present'
-# #       tags:
-# #         - smb
+# - name: Deploy SMB Shares to Storage Node
+#   hosts: ClusterGroup
+#   gather_facts: false
+#   become: true
+#   roles:
+#     - role: smb_fileshares
+#       when: state == 'present'
+#       tags:
+#         - smb
 
 
 - name: Deploy Rancher 
