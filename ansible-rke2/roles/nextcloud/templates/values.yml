@@ -53,6 +53,9 @@ nextcloud:
     runAsGroup: 33
   redis:
     enabled: true
+  extraEnv:
+    - name: UNZIP_DISABLE_ZIPBOMB_DETECTION
+      value: "TRUE"
 livenessProbe:
   enabled: true
   initialDelaySeconds: 120
@@ -145,3 +148,5 @@ resources:
   limits:
     cpu: 1
     memory: 2Gi
+
+
