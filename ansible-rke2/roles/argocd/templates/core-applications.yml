@@ -262,3 +262,36 @@ applications:
         prune: true
       syncOptions:
         - CreateNamespace=true
+  
+  nextcloud_test:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+
+    # Multi-source: Helm chart + your values repo
+    sources:
+      - repoURL: https://nextcloud.github.io/helm/
+        chart: nextcloud
+        targetRevision: "*"    # or pin a version
+        helm:
+          valueFiles:
+            - $values/ansible-rke2/roles/nextcloud/templates/values2.yml
+
+      - repoURL: https://github.com/KingRiq/KubernetesOps.git
+        targetRevision: main
+        ref: values
+      
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/Nextcloud
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: nextcloud-test
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
