@@ -1,0 +1,152 @@
+mariadb:
+  enabled: true
+  architecture: standalone
+
+  auth:
+    existingSecret: nextcloud-secrets
+    username: nextcloud
+    database: nextcloud
+
+  primary:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+# TODO verify against bitnami chart that persistence here is correct we could be setting up
+# It may be sufficient since we are declaring our own pvcs to just do that but if we can we can just set it up via this chart
+# and I can delete some code
+    persistence:
+      enabled: true
+      existingClaim: nextcloud-mariadb   # <-- must match the PVC you created in Ansible
+      accessModes:
+        - ReadWriteOnce
+      size: 50Gi             # Helm chart still needs a size, but your PVC spec wins
+      storageClass: "nfs-rwo"       # blank since we’re binding manually
+  containerSecurityContext:
+    runAsUser: 0
+    runAsGroup: 0
+    fsGroup: 0
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/mariadb
+    tag: 12.0.2-debian-12-r0
+
+nextcloud:
+  host: 192.168.0.240         
+  existingSecret:
+    enabled: true
+    secretName: nextcloud-secrets
+    usernameKey: username
+    passwordKey: password
+  
+  trustedDomains:             
+    - 192.168.0.222
+    - cloud.chaoscauldron.space
+    - nextcloud.default.svc
+    - nextcloud.default.svc.cluster.local
+  podSecurityContext:
+    fsGroup: 0
+    runAsUser: 0
+    runAsGroup: 33
+  redis:
+    enabled: true
+  extraEnv:
+    - name: UNZIP_DISABLE_ZIPBOMB_DETECTION
+      value: "TRUE"
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 10
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 10
+startupProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 10
+persistence:
+  enabled: true
+  existingClaim: nextcloud-data
+  accessMode: ReadWriteMany
+  size: 2Ti
+  storageClass: "rwx"  
+  name: nextcloud-data
+              
+ 
+service:
+  type: LoadBalancer
+  loadBalancerIP: 192.168.0.222
+  port: 80
+  targetPort: 80
+
+ingress:
+  enabled: false
+
+externalDatabase:
+  enabled: true
+  type: mysql
+  host: nextcloud-mariadb
+  user: nextcloud
+  database: nextcloud
+  existingSecret:
+    enabled: true
+    secretName: nextcloud-secrets
+    usernameKey: db-username
+    passwordKey: password
+
+internalDatabase:
+  enabled: false
+
+redis:
+  enabled: true
+  architecture: standalone
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/redis
+    tag: 8.2.1-debian-12-r0
+
+  auth:
+    enabled: false   # keep it simple at first; you can add a password later
+
+  master:
+    persistence:
+      enabled: false
+      storageClass: rwo
+      size: 5Gi
+      accessModes:
+        - ReadWriteOnce
+      existingClaim: "nextcloud-redis"  
+    configuration: |
+      loglevel verbose
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+global:
+  security:
+    allowInsecureImages: true
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 1Gi
+  limits:
+    cpu: 1
+    memory: 2Gi
+
+
