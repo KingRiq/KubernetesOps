@@ -263,7 +263,7 @@ applications:
       syncOptions:
         - CreateNamespace=true
   
-  nextcloud_test:                      # <-- key becomes metadata.name
+  nextcloudtest:                      # <-- key becomes metadata.name
     namespace: argocd
     project: default
 
@@ -282,13 +282,33 @@ applications:
       
       - repoURL: https://github.com/KingRiq/CoreApplications.git
         targetRevision: main
-        path: applications/Nextcloud
+        path: applications/Nextcloud_test
         directory:
           recurse: true
 
     destination:
       server: https://kubernetes.default.svc
       namespace: nextcloud-test
+
+    syncPolicy:
+      automated:
+        prune: true
+      syncOptions:
+        - CreateNamespace=true
+        
+  arrstack:                      # <-- key becomes metadata.name
+    namespace: argocd
+    project: default
+    sources:
+      - repoURL: https://github.com/KingRiq/CoreApplications.git
+        targetRevision: main
+        path: applications/ArrStack
+        directory:
+          recurse: true
+
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: media-stack
 
     syncPolicy:
       automated:

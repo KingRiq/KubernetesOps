@@ -114,8 +114,7 @@ configs:
       name: coreapplications
       url: https://github.com/KingRiq/CoreApplications.git
       username: KingRiq
-      password: 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
-
+      password: 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
 
 
   # # Repositories (credentialTemplates make these reusable)

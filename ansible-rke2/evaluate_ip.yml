@@ -8,30 +8,29 @@
 
   tasks:
     - block:
-        - name: Verify SSH via External IP
-          wait_for_connection:
-            timeout: 5
-          register: res_external
-          delegate_to: "{{ external_ip }}"
+      - name: Verify SSH via Internal IP
+        wait_for_connection:
+          timeout: 5
+        register: res_internal
+        delegate_to: "{{ internal_ip }}"
 
-        - name: Set SSH to External IP
-          set_fact:
-            ansible_host: "{{ external_ip }}"
-          when: res_external is succeeded
-
+      - name: Fallback - Use internal IP
+        set_fact:
+          ansible_host: "{{ internal_ip }}"
+        when: res_internal is succeeded
+    
       rescue:
         - block:
-          - name: Verify SSH via Internal IP
+          - name: Verify SSH via External IP
             wait_for_connection:
               timeout: 5
-            register: res_internal
-            delegate_to: "{{ internal_ip }}"
+            register: res_external
+            delegate_to: "{{ external_ip }}"
 
-
-          - name: Fallback - Use internal IP
+          - name: Set SSH to External IP
             set_fact:
-              ansible_host: "{{ internal_ip }}"
-            when: res_internal is succeeded
+              ansible_host: "{{ external_ip }}"
+            when: res_external is succeeded
 
           rescue:
             - name: Verify SSH via Originally Configured IP
