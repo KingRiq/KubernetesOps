@@ -92,17 +92,17 @@
 #         - smb
 
 
-- name: Deploy Rancher 
-  hosts: control
-  gather_facts: false
-  become: true
-  roles:
-    - role: rancher
-      when: state == 'present'
-      tags:
-        - rancher
-
 # - name: Deploy Rancher 
+#   hosts: control
+#   gather_facts: false
+#   become: true
+#   roles:
+#     - role: rancher
+#       when: state == 'present'
+#       tags:
+#         - rancher
+
+# - name: Deploy Nextcloud
 #   hosts: control
 #   gather_facts: false
 #   become: true
@@ -110,9 +110,9 @@
 #     - role: nextcloud
 #       when: state == 'present'
 #       tags:
-#         - rancher
+#         - nextcloud
 
-# - name: Deploy Rancher 
+# - name: Deploy Immich 
 #   hosts: control
 #   gather_facts: false
 #   become: true
@@ -120,4 +120,4 @@
 #     - role: immich
 #       when: state == 'present'
 #       tags:
-#         - rancher
+#         - immich
