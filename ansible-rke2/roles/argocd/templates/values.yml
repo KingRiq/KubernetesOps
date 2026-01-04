@@ -1,6 +1,6 @@
 global:
   image:
-    tag: v2.13.0
+    tag: latest
   securityContext:
     runAsNonRoot: true
     fsGroup: 999
@@ -99,7 +99,7 @@ configs:
   secret:
     # Optional: override admin password (bcrypt hash)
     # You can generate this with: htpasswd -nbBC 10 "" "mypassword" | tr -d ':\n'
-    argocdServerAdminPassword: "$2y$10$nykrgqeG8LK9lF3sfww34uItwvc8Oz29DRaolWahzEOBSy7y3VEN2"
+    argocdServerAdminPassword: "{{ argo_admin_pass }}"
   clusters:
     - name: default
       server: https://kubernetes.default.svc
@@ -114,36 +114,7 @@ configs:
       name: coreapplications
       url: https://github.com/KingRiq/CoreApplications.git
       username: KingRiq
-      password: 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
-
-
-  # # Repositories (credentialTemplates make these reusable)
-  # credentialTemplates:
-  #   github-creds:
-  #     url: https://github.com/YourUser/KubernetesOps.git
-  #     username: "YourUser"
-  #     password: "ghp_yourPersonalAccessToken"
-
-  # # Optional: inline repository definitions (for private repos)
-  # repositories:
-  #   kubernetesops:
-  #     url: https://github.com/YourUser/KubernetesOps.git
-  #     type: git
-  #     name: kubernetesops
-  #     passwordSecret:
-  #       name: argocd-secret
-  #       key: githubToken
-
-  # # Optional: Cluster credentials
-  # clusters:
-  #   mycluster:
-  #     server: "https://192.168.0.100:6443"
-  #     name: "rke2"
-  #     config:
-  #       bearerToken: "REDACTED_TOKEN"
-  #       tlsClientConfig:
-  #         insecure: false
-  #         caData: "BASE64_CA_CERT"
+      password: "{{ git_pat }}"
 
 applicationSet:
   enabled: true
