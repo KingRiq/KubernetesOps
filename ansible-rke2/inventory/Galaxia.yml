@@ -1,6 +1,6 @@
 all:
   hosts:
-    control-plane:
+    manager1:
       ansible_host: 59.22.6.134
       internal_address:
         ip: 59.22.6.100
@@ -10,7 +10,7 @@ all:
         ip: 192.168.0.100
         gateway: 192.168.0.1
         dns: 192.168.0.1
-    worker1:
+    manager2:
       ansible_host: 59.22.6.130
       internal_address:
         ip: 59.22.6.101
@@ -20,7 +20,7 @@ all:
         ip: 192.168.0.101
         gateway: 192.168.0.1
         dns: 192.168.0.1
-    worker2:
+    manager3:
       ansible_host: 59.22.6.131
       internal_address:
         ip: 59.22.6.102
@@ -30,7 +30,7 @@ all:
         ip: 192.168.0.102
         gateway: 192.168.0.1
         dns: 192.168.0.1
-    worker3:
+    worker1:
       ansible_host: 59.22.6.132
       internal_address:
         ip: 59.22.6.103
@@ -43,7 +43,7 @@ all:
 
   vars:
     netmask: 24
-    storage_node: worker1
+    storage_node: manager2
     storage_node_ip: 192.168.0.101
     samba_assigned_ip: 192.168.0.235
     nfs_assigned_ip: 192.168.0.236
@@ -55,8 +55,8 @@ ClusterGroup:
 
 control:
   hosts:
-    control-plane:
+    manager[1:3]:
 
 workers:
   hosts:
-    worker[1:3]:
+    worker1:

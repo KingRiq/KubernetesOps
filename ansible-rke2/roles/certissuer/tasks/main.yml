@@ -22,6 +22,7 @@
     path: "{{ ca_key }}"
   register: key_file
 
+
 - block:
     - name: Generate CA private key if it doesn’t exist
       ansible.builtin.command: >
@@ -29,6 +30,11 @@
       args:
         creates: "{{ ca_key }}"
       register: gen_key
+
+    - name: Verify CA key was created
+      ansible.builtin.stat:
+        path: "{{ ca_key }}"
+      register: ca_key_stat
 
     - name: Generate self-signed CA certificate if it doesn’t exist
       ansible.builtin.command: >
@@ -58,8 +64,24 @@
       ansible.builtin.debug:
         msg: "{{ ca_info.stdout_lines | default(['CA not found']) }}"
 
-# if self_signed is true but certfiles exist there is no need to create a CA
-  when: "self_signed == 'true' and (not crt_file.stat.exists or not key_file.stat.exists)"
+# if self_signed is true but certfiles exist there is no need to create a CA we already have them we just need to create a secret!
+  when: "self_signed is defined and self_signed == 'true' and (not crt_file.stat.exists or not key_file.stat.exists)"
+
+- name: Debug TLS secret check
+  ansible.builtin.debug:
+    msg:
+      - "crt_fil exist Return Code: {{ crt_file | default('none') }}"
+
+
+- name: Debug TLS secret check
+  ansible.builtin.debug:
+    msg:
+      - "key file exist Return Code: {{ key_file | default('none') }}"
+
+- name: Debug TLS secret check
+  ansible.builtin.debug:
+    msg:
+      - "ca_crt_stat exist Return Code: {{ ca_crt_stat | default('none') }}"
 
 - name: Create TLS secret using kubectl
   ansible.builtin.command: >
@@ -70,11 +92,12 @@
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
   failed_when: false
-  # do not create the CA if we did not want a self signed one or we don't have the files to do it... but do so if we created one because it totally makes sense to do it if we did
-  when: ((crt_file.stat.exists and key_file.stat.exists) or ca_crt_stat.stat.exists) and (self_signed == 'true')
+  # Create a secret from the files located in mount key,crt
+  # if they do not exist quickly verify that we want self signed certs because we can simply just request real ones from lets encrypt
+  when: "(((crt_file is defined and crt_file.stat.exists) and (key_file is defined and key_file.stat.exists)) or ((self_signed is defined and self_signed == 'true') and (ca_crt_stat is defined and ca_crt_stat.stat.exists)))"
 
 - name: Apply ClusterIssuer template
-  delegate_to: control-plane
+  delegate_to: manager1
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
     state: present

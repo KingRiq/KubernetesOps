@@ -11,7 +11,7 @@
 - name: Unmount all NFS and CIFS mounts
   become: true
   shell: |
-    umount -a -t nfs,cifs,smbfs -f -l
+    umount -a -t nfs4,nfs,cifs,smbfs -f -l
 
 - name: KILLEMALL!!
   become: true

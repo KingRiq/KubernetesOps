@@ -10,9 +10,4 @@ storage_classes:
 
 additional_mount: ""
 additional_volumes: ""
-mountingOptions:
-  - vers=4.1
-  -_proto=tcp
-  - hard
-  - intr
-  nofail,relatime,noacl,async,rsize=32768,wsize=32768,timeo=600
+mountingOptions: vers=4.1,proto=tcp,hard,intr,nofail,relatime,noacl,async,rsize=32768,wsize=32768,timeo=600

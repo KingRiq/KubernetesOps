@@ -80,7 +80,7 @@
     dest: /tmp/grafana-vs.yml
 
 - name: Apply Grafana VirtualService
-  delegate_to: control-plane
+  delegate_to: manager1
   become: true
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"

@@ -7,11 +7,12 @@
     fstype: "cifs"
 
   tasks:
-    - name: Unmount the SMB share if mounted
+    - name: Unmount the nfs share if mounted
       mount:
         path: "{{ mount_point }}"
-        fstype: "{{ fstype }}"
-        state: unmounted
+        fstype: "nfs"
+        state: absent_from_fstab
+
 
     - name: Remove fstab entry (if it exists)
       mount:
@@ -19,7 +20,20 @@
         fstype: "{{ fstype }}"
         state: absent_from_fstab
 
-    # - name: Remove mount directory
-    #   file:
-    #     path: "{{ mount_point }}"
-    #     state: absent
+    - name: Unmount the SMB share if mounted
+      mount:
+        path: "{{ mount_point }}"
+        fstype: "nfs"
+        state: unmounted
+
+    - name: Unmount the SMB share if mounted
+      mount:
+        path: "{{ mount_point }}"
+        fstype: "{{ fstype }}"
+        state: unmounted
+    
+    - name: Remove mount directory
+      file:
+        path: "{{ mount_point }}"
+        state: absent
+      when: inventory_hostname != storage_node

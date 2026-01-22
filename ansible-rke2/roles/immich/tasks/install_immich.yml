@@ -48,7 +48,7 @@
     dest: /tmp/immich-postgres.yml
   delegate_to: "{{ item }}"
   loop: 
-    - 'control-plane'
+    - 'manager1'
     - 'localhost'
 
 
@@ -74,12 +74,12 @@
     dest: /tmp/immich-vs.yml
   delegate_to: "{{ item }}"
   loop: 
-    - 'control-plane'
+    - 'manager1'
     - 'localhost'
 
 
 - name: Apply Immich VirtualService
-  delegate_to: control-plane
+  delegate_to: manager1
   become: true
   kubernetes.core.k8s:
     kubeconfig: /etc/rancher/rke2/rke2.yaml
@@ -92,11 +92,11 @@
     dest: /tmp/machine-vs.yml
   delegate_to: "{{ item }}"
   loop: 
-    - 'control-plane'
+    - 'manager1'
     - 'localhost'
 
 - name: Apply Immich VirtualService
-  delegate_to: control-plane
+  delegate_to: manager1
   become: true
   kubernetes.core.k8s:
     kubeconfig: /etc/rancher/rke2/rke2.yaml

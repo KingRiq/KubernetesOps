@@ -19,24 +19,25 @@
     mode: '0755'
   delegate_to: localhost
 
-- name: Download MetalLB manifest
-  get_url:
-    url: "https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml"
-    dest: "{{ playbook_dir }}/files/metallb-native.yaml"
-    mode: '0644'
-  delegate_to: localhost
+# - name: Download MetalLB manifest
+#   get_url:
+#     url: "https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml"
+#     dest: "{{ playbook_dir }}/files/metallb-native.yaml"
+#     mode: '0644'
+#     timeout: 60
+#   delegate_to: localhost
+#   run_once: true
 
-- name: Copy MetalLB manifest from repo to control-plane
+- name: Copy MetalLB manifest from repo to manager1
   copy:
     src: "{{ playbook_dir }}/files/metallb-native.yaml"
-    dest: /tmp/metallb-native.yaml
-  delegate_to: control-plane
+    dest: /tmp/metallb-native.yml
 
 - name: Apply MetalLB manifest
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
     state: present
-    src: "/tmp/metallb-native.yaml"
+    src: "/tmp/metallb-native.yml"
 
 - name: Wait for MetalLB controller pods to be ready
   kubernetes.core.k8s_info:

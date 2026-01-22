@@ -3,9 +3,13 @@
   copy:
     dest: /etc/rancher/rke2/config.yaml
     content: |
+      cluster-init: true
       cluster-dns: 10.43.0.10
+      node-ip: "{{ hostvars[groups['control'][0]].external_address.ip }}"
+      tls-san:
+        - "{{ hostvars[groups['control'][0]].external_address.ip }}"
     mode: '0755'
-  when: inventory_hostname in groups['control']
+  when: inventory_hostname == groups['control'][0]
 
 
 - name: Stage NGINX config before starting rke2
@@ -14,7 +18,7 @@
     state: directory
     owner: root
     group: root
-    mode: "{{ item.mode | default('0775') }}"
+    mode: '0775'
   when: inventory_hostname in groups['control']
 
 - name: Ensure NGINX ingress config is applied
@@ -23,34 +27,88 @@
     dest: /var/lib/rancher/rke2/server/manifests/rke2-ingress-nginx-config.yaml
     owner: root
     group: root
-    mode: '0644'
+    mode: '0755'
   when: inventory_hostname in groups['control']
   
 - name: Enable the rke2-server
   systemd:
     name: rke2-server
     enabled: yes
-  when: inventory_hostname in groups['control']
+  when: inventory_hostname == groups['control'][0]
 
 - name: Start the rke2-server
   systemd:
     name: rke2-server
     state: started
-  when: inventory_hostname in groups['control']
+  when: inventory_hostname == groups['control'][0]
 
-- name: Add RKE2 bin directory to root's .bashrc
-  lineinfile:
-    path: /root/.bashrc
-    regexp: '^export PATH='
-    line: 'export PATH=$PATH:/var/lib/rancher/rke2/bin'
-    create: yes
+- name: Wait for RKE2 internal API to become reachable (port 9345)
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: 9345
+    timeout: 180
+  when: inventory_hostname == groups['control'][0]
 
-- name: Add KUBECONFIG to root's .bashrc
-  lineinfile:
-    path: /root/.bashrc
-    regexp: '^export KUBECONFIG='
-    line: 'export KUBECONFIG=/etc/rancher/rke2/rke2.yaml'
-    create: yes
+- name: Wait for Kubernetes API to become reachable (port 6443)
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: 6443
+    timeout: 180
+  when: inventory_hostname == groups['control'][0]
+
+- name: Read RKE2 server token
+  slurp:
+    src: /var/lib/rancher/rke2/server/node-token
+  register: rke2_token_file
+  when: inventory_hostname == groups['control'][0]
+
+- name: Set token fact on control plane node
+  set_fact:
+    rke2_token: "{{ rke2_token_file.content | b64decode | trim }}"
+  when: inventory_hostname == groups['control'][0]
+
+
+- name: Share token and server URL with all nodes
+  set_fact:
+    rke2_token: "{{ hostvars[groups['control'][0]].rke2_token }}"
+    rke2_server_url: "https://{{ hostvars[groups['control'][0]].external_address.ip }}:9345"
+  when: hostvars[groups['control'][0]].rke2_token is defined
+
+- name: Debug token on manager1
+  debug:
+    var: rke2_token
+
+- name: Debug token on manager1
+  debug:
+    var: rke2_server_url
+
+- name: Configure RKE2 server config on additional manager1s (join bootstrap)
+  copy:
+    dest: /etc/rancher/rke2/config.yaml
+    content: |
+      server: "https://{{ hostvars[groups['control'][0]].external_address.ip }}:9345"
+      token: "{{ rke2_token }}"
+      cluster-dns: 10.43.0.10
+    mode: '0755'
+  when:
+    - inventory_hostname in groups['control']
+    - inventory_hostname != groups['control'][0]
+
+- name: Enable the rke2-server (additional control planes)
+  systemd:
+    name: rke2-server
+    enabled: yes
+  when:
+    - inventory_hostname in groups['control']
+    - inventory_hostname != groups['control'][0]
+
+- name: Start the rke2-server (additional control planes)
+  systemd:
+    name: rke2-server
+    state: started
+  when:
+    - inventory_hostname in groups['control']
+    - inventory_hostname != groups['control'][0]
 
 - name: Wait for RKE2 internal API to become reachable (port 9345)
   wait_for:
@@ -66,34 +124,13 @@
     timeout: 180
   when: inventory_hostname in groups['control']
 
-- name: Read RKE2 server token
-  slurp:
-    src: /var/lib/rancher/rke2/server/node-token
-  register: rke2_token_file
-  when: inventory_hostname in groups['control']
-
-- name: Set token fact on control plane node
-  set_fact:
-    rke2_token: "{{ rke2_token_file.content | b64decode | trim }}"
-  when: inventory_hostname in groups['control']
-
-- name: Debug token on control-plane
-  debug:
-    var: rke2_token
-  when: inventory_hostname in groups['control']
-
-- name: Share token and server URL with all nodes
-  set_fact:
-    rke2_token: "{{ hostvars[groups['control'][0]].rke2_token }}"
-    rke2_server_url: "https://{{ hostvars[groups['control'][0]].ansible_host }}:9345"
-
 - name: Configure RKE2 agent
   copy:
     dest: /etc/rancher/rke2/config.yaml
     content: |
       server: "{{ rke2_server_url }}"
       token: "{{ rke2_token }}"
-    mode: '0600'
+    mode: '0755'
   when: inventory_hostname in groups['workers']
 
 - name: Enable rke2-agent service
@@ -108,4 +145,17 @@
     state: started
   when: inventory_hostname in groups['workers']
 
+- name: Add RKE2 bin directory to root's .bashrc
+  lineinfile:
+    path: /root/.bashrc
+    regexp: '^export PATH='
+    line: 'export PATH=$PATH:/var/lib/rancher/rke2/bin'
+    create: yes
+
+- name: Add KUBECONFIG to root's .bashrc
+  lineinfile:
+    path: /root/.bashrc
+    regexp: '^export KUBECONFIG='
+    line: 'export KUBECONFIG=/etc/rancher/rke2/rke2.yaml'
+    create: yes
 

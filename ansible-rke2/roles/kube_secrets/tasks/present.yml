@@ -5,7 +5,7 @@
     dest: /tmp/{{ secret_name }}.yml
   delegate_to: "{{ item }}"
   loop: 
-    - 'control-plane'
+    - 'manager1'
     - 'localhost'
 
 - name: Apply Kubernetes secret

@@ -5,11 +5,11 @@
     dest: /tmp/{{ service }}-vs.yml
   delegate_to: "{{ item }}"
   loop:
-   - 'control-plane'
+   - 'manager1'
    - 'localhost'
 
 - name: Apply {{ service }} VirtualService
-  delegate_to: control-plane
+  delegate_to: manager1
   become: true
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
