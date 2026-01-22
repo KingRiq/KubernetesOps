@@ -21,7 +21,8 @@
   gather_facts: false
   roles:
     - role: rke2
-
+      tags:
+        - rke2
 
 - name: Deploy MetalLB 
   hosts: control
@@ -69,15 +70,15 @@
 #         - istio
 
 
-# - name: Deploy NFS Provisioner
-#   hosts: control
-#   gather_facts: false
-#   become: true
-#   roles:
-#     - role: nfs-provisioner
-#       when: state == 'present'
-#       tags:
-#         - nfs
+- name: Deploy NFS Provisioner
+  hosts: control
+  gather_facts: false
+  become: true
+  roles:
+    - role: nfs-provisioner
+      when: state == 'present'
+      tags:
+        - nfs
 
 
 
@@ -121,3 +122,8 @@
 #       when: state == 'present'
 #       tags:
 #         - immich
+
+- import_playbook: remove_fileshares.yml
+  tags:
+    - nfs
+  when: state == 'absent'

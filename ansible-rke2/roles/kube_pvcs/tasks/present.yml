@@ -2,7 +2,7 @@
   template:
     src: template-pvc.yaml.j2
     dest: /tmp/{{ item.pvc_name }}-pvc.yml
-  delegate_to: control-plane
+  delegate_to: manager1
   loop:
     "{{ pvc_list }}"
 

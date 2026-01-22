@@ -59,6 +59,7 @@
     wait: true
     wait_timeout: 600s
     atomic: true
+  delegate_to: manager1
 
 - name: Install/Upgrade Argo Apps Helm
   kubernetes.core.helm:
@@ -71,13 +72,14 @@
     wait: true
     wait_timeout: 600s
     atomic: true
+  delegate_to: manager1
 # - name: Copy Immich VirtualService from template directory
 #   template:
 #     src: immich-vs.yml
 #     dest: /tmp/immich-vs.yml
 
 # - name: Apply Immich VirtualService
-#   delegate_to: control-plane
+#   delegate_to: manager1
 #   become: true
 #   kubernetes.core.k8s:
 #     kubeconfig: /etc/rancher/rke2/rke2.yaml

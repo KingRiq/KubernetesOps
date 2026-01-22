@@ -10,11 +10,11 @@
     dest: "{{ item.dest }}"
   delegate_to: "{{ item.host }}"
   loop:
-    - { src: 'nfs-provisioner-deploy.yaml.j2', dest: '/tmp/NFS-Provisioner-Deploy.yml', host: 'control-plane'}
+    - { src: 'nfs-provisioner-deploy.yaml.j2', dest: '/tmp/NFS-Provisioner-Deploy.yml', host: 'manager1'}
     - { src: 'nfs-provisioner-deploy.yaml.j2', dest: '/tmp/NFS-Provisioner-Deploy.yml', host: 'localhost'}
-    - { src: 'storageClass.yaml.j2', dest: '/tmp/NFS_Storage_Classes.yml', host: 'control-plane'}
+    - { src: 'storageClass.yaml.j2', dest: '/tmp/NFS_Storage_Classes.yml', host: 'manager1'}
     - { src: 'storageClass.yaml.j2', dest: '/tmp/NFS_Storage_Classes.yml', host: 'localhost'}
-    - { src: 'serviceaccount.yaml.j2', dest: '/tmp/Service_Account.yml', host: 'control-plane'}
+    - { src: 'serviceaccount.yaml.j2', dest: '/tmp/Service_Account.yml', host: 'manager1'}
     - { src: 'serviceaccount.yaml.j2', dest: '/tmp/Service_Account.yml', host: 'localhost'}
 
 - name: Deploy NFS provisioner

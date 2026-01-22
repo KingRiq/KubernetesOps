@@ -46,7 +46,7 @@
   kubernetes.core.helm:
     kubeconfig: "{{ kubeconfig }}"
     name: istiod                    # Helm release name for control plane
-    chart_ref: istio/istiod         # The control-plane chart
+    chart_ref: istio/istiod         # The manager1 chart
     release_namespace: istio-system # Lives with base CRDs
     wait: true                      # Block until Helm sees resources ready
     wait_timeout: 900s
@@ -79,7 +79,7 @@
     dest: /tmp/values-ingressgateway.yml
   delegate_to: "{{ item }}"
   loop: 
-    - 'control-plane'
+    - 'manager1'
     - 'localhost'
 
 - name: Copy egressgateway from template directory
@@ -88,7 +88,7 @@
     dest: /tmp/values-egressgateway.yml
   delegate_to: "{{ item }}"
   loop: 
-    - 'control-plane'
+    - 'manager1'
     - 'localhost'
 
 - name: Install/Upgrade ingress gateway
@@ -133,7 +133,7 @@
         name: "networking"
 
 - name: Apply Gateway (networking namespace)
-  delegate_to: control-plane
+  delegate_to: manager1
   become: true
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
@@ -146,7 +146,7 @@
     dest: /tmp/ingress-class.yml
 
 - name: Apply Istio Ingress Class to Cluster
-  delegate_to: control-plane
+  delegate_to: manager1
   become: true
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
@@ -159,7 +159,7 @@
     dest: /tmp/ingress.yml
 
 - name: Apply NGINX Ingress to Cluster
-  delegate_to: control-plane
+  delegate_to: manager1
   become: true
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
