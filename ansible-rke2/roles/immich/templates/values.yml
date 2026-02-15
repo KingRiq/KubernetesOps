@@ -22,8 +22,8 @@ controllers:
             cpu: 250m
             memory: 512Mi
           limits:
-            cpu: 1000m
-            memory: 1Gi
+            cpu: 2
+            memory: 2Gi
 
 immich:
   persistence:
@@ -71,8 +71,8 @@ machine-learning:
               cpu: 250m
               memory: 500Mi
             limits:
-              cpu: "800m"
-              memory: 1Gi          
+              cpu: "4"
+              memory: 2Gi          
   service:
     main:
       enabled: true

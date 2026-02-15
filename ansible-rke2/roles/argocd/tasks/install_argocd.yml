@@ -61,17 +61,22 @@
     atomic: true
   delegate_to: manager1
 
-- name: Install/Upgrade Argo Apps Helm
-  kubernetes.core.helm:
-    kubeconfig: "{{ kubeconfig }}"
-    name: "argocd-apps"
-    chart_ref: "argo/argocd-apps"
-    release_namespace: "{{ argocd_namespace }}"
-    values_files:
-      - "/tmp/core-applications.yml"
-    wait: true
-    wait_timeout: 600s
-    atomic: true
+# - name: Install/Upgrade Argo Apps Helm
+#   kubernetes.core.helm:
+#     kubeconfig: "{{ kubeconfig }}"
+#     name: "argocd-apps"
+#     chart_ref: "argo/argocd-apps"
+#     release_namespace: "{{ argocd_namespace }}"
+#     values_files:
+#       - "/tmp/core-applications.yml"
+#     wait: true
+#     wait_timeout: 600s
+#     atomic: true
+- name: Deploy Argo CD Application
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: /etc/rancher/rke2/rke2.yaml
+    definition: "{{ lookup('template', 'galaxia_aoa.yml') | from_yaml }}"
   delegate_to: manager1
 # - name: Copy Immich VirtualService from template directory
 #   template:

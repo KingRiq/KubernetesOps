@@ -1,7 +1,7 @@
 all:
   hosts:
     manager1:
-      ansible_host: 59.22.6.134
+      ansible_host: 59.22.6.130
       internal_address:
         ip: 59.22.6.100
         gateway: 59.22.0.1
@@ -11,7 +11,7 @@ all:
         gateway: 192.168.0.1
         dns: 192.168.0.1
     manager2:
-      ansible_host: 59.22.6.130
+      ansible_host: 59.22.6.138
       internal_address:
         ip: 59.22.6.101
         gateway: 59.22.0.1
@@ -21,7 +21,7 @@ all:
         gateway: 192.168.0.1
         dns: 192.168.0.1
     manager3:
-      ansible_host: 59.22.6.131
+      ansible_host: 59.22.6.141
       internal_address:
         ip: 59.22.6.102
         gateway: 59.22.0.1
@@ -31,7 +31,7 @@ all:
         gateway: 192.168.0.1
         dns: 192.168.0.1
     worker1:
-      ansible_host: 59.22.6.132
+      ansible_host: 59.22.6.139
       internal_address:
         ip: 59.22.6.103
         gateway: 59.22.0.1

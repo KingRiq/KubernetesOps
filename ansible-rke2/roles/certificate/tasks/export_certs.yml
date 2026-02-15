@@ -1,0 +1,31 @@
+- name: Ensure export directory exists
+  file:
+    path: "{{ cert_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Read TLS secret from Kubernetes
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    api_version: v1
+    kind: Secret
+    name: "{{ cert_secret_name }}"
+    namespace: "{{ cert_namespace }}"
+  register: tls_secret
+
+- name: Fail if secret not found
+  fail:
+    msg: "TLS secret {{ cert_secret_name }} not found in namespace {{ cert_namespace }}"
+  when: tls_secret.resources | length == 0
+
+- name: Write certificate file
+  copy:
+    dest: "{{ cert_dir }}/galaxia.crt"
+    content: "{{ tls_secret.resources[0].data['tls.crt'] | b64decode }}"
+    mode: '0755'
+
+- name: Write private key file
+  copy:
+    dest: "{{ cert_dir }}/galaxia.key"
+    content: "{{ tls_secret.resources[0].data['tls.key'] | b64decode }}"
+    mode: '0755'
