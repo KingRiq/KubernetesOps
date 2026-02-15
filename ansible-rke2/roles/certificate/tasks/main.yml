@@ -1,22 +1,5 @@
-- name: Copy Certificate from template directory
-  template:
-    src: certificate.yml.j2
-    dest: /tmp/certificate.yml.j2
+- include_tasks: export_certs.yml
+  when: state == 'absent'
 
-- name: Apply Certificate to Cluster
-  delegate_to: manager1
-  become: true
-  kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/rke2/rke2.yaml
-    state: present
-    definition: "{{ lookup('template', 'certificate.yml.j2') }}"
-  when: self_signed is not defined or self_signed == false 
-
-# - name: Apply Certificate to Cluster
-#   delegate_to: manager1
-#   become: true
-#   kubernetes.core.k8s:
-#     kubeconfig: /etc/rancher/rke2/rke2.yaml
-#     state: present
-#     definition: "{{ lookup('template', 'certificate.yml.j2') }}"
-#   when: self_signed is defined and self_signed == 'true' 
+- include_tasks: generate_certificate.yml
+  when: state == 'present'

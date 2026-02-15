@@ -3,3 +3,5 @@ cert_manager_namespace: cert-manager
 letsencrypt_issuer_name: letsencrypt-prod
 signed_issuer_name: ruler-of-shadow-galactia
 issuer_name: "{{ letsencrypt_issuer_name if self_signed is undefined or self_signed == 'false' else signed_issuer_name }}"
+cert_secret_name: galaxia-tls
+cert_namespace: istio-ingress

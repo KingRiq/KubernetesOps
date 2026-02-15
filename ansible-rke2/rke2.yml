@@ -13,7 +13,7 @@
 
 - import_playbook: install_helm.yml
   tags:
-    - active
+    - rke2
 
 - name: "{{ state }}ing RKE2 nodes "
   hosts: ClusterGroup
@@ -59,6 +59,16 @@
       tags:
         - certs
 
+
+- name: Export Certificates
+  hosts: control
+  gather_facts: false
+  become: true
+  roles:
+    - role: certificate
+      when: state == 'absent'
+      tags:
+        - certs
 # - name: Deploy Istio
 #   hosts: control
 #   gather_facts: false
