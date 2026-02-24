@@ -8,27 +8,29 @@
       node-ip: "{{ hostvars[groups['control'][0]].external_address.ip }}"
       tls-san:
         - "{{ hostvars[groups['control'][0]].external_address.ip }}"
+      # disable:
+      #   - rke2-ingress-nginx
     mode: '0755'
   when: inventory_hostname == groups['control'][0]
 
 
-- name: Stage NGINX config before starting rke2
-  file:
-    path: /var/lib/rancher/rke2/server/manifests/
-    state: directory
-    owner: root
-    group: root
-    mode: '0775'
-  when: inventory_hostname in groups['control']
+# - name: Stage NGINX config before starting rke2
+#   file:
+#     path: /var/lib/rancher/rke2/server/manifests/
+#     state: directory
+#     owner: root
+#     group: root
+#     mode: '0775'
+#   when: inventory_hostname in groups['control']
 
-- name: Ensure NGINX ingress config is applied
-  ansible.builtin.template:
-    src: templates/rke2-ingress-nginx-config.yaml.j2
-    dest: /var/lib/rancher/rke2/server/manifests/rke2-ingress-nginx-config.yaml
-    owner: root
-    group: root
-    mode: '0755'
-  when: inventory_hostname in groups['control']
+# - name: Ensure NGINX ingress config is applied
+#   ansible.builtin.template:
+#     src: templates/rke2-ingress-nginx-config.yaml.j2
+#     dest: /var/lib/rancher/rke2/server/manifests/rke2-ingress-nginx-config.yaml
+#     owner: root
+#     group: root
+#     mode: '0755'
+#   when: inventory_hostname in groups['control']
   
 - name: Enable the rke2-server
   systemd:
@@ -145,6 +147,14 @@
     state: started
   when: inventory_hostname in groups['workers']
 
+- name: Deploy bashrc from template
+  template:
+    src: templates/bashrc.j2
+    dest: "~/.bashrc"
+    owner: root
+    group: root
+    mode: '0755'
+
 - name: Add RKE2 bin directory to root's .bashrc
   lineinfile:
     path: /root/.bashrc
@@ -155,7 +165,7 @@
 - name: Add KUBECONFIG to root's .bashrc
   lineinfile:
     path: /root/.bashrc
-    regexp: '^export KUBECONFIG='
+    regexp: '^e xport KUBECONFIG='
     line: 'export KUBECONFIG=/etc/rancher/rke2/rke2.yaml'
     create: yes
 

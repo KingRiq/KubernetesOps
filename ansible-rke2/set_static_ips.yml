@@ -2,82 +2,160 @@
 # utility for uniformity of the ip addresses
 
 - import_playbook: evaluate_ip.yml
+
 - name: Set static IP on Rocky Linux with dynamic interface detection
   hosts: ClusterGroup
   become: yes
+  gather_facts: no
 
   tasks:
-    - name: Find active ethernet interface
-      command: nmcli -t -f DEVICE,TYPE device status
-      register: nmcli_output
+    # ----------------------------
+    # Detect devices (NICs)
+    # ----------------------------
+    - name: Find ethernet devices and their state
+      command: nmcli -t -f DEVICE,TYPE,STATE device status
+      register: nmcli_dev
+      changed_when: false
 
-    - name: Parse ethernet interface name
+    - name: Build list of ethernet device names (connected or disconnected)
       set_fact:
-        eth_iface: "{{ item.split(':')[0] }}"
-      loop: "{{ nmcli_output.stdout_lines }}"
-      when: "'ethernet' in item"
-      register: iface_fact
+        eth_devs: >-
+          {{
+            nmcli_dev.stdout_lines
+            | select('search', ':ethernet:(connected|disconnected)$')
+            | map('regex_replace', ':ethernet:(connected|disconnected)$', '')
+            | list
+          }}
 
-    - name: Debug parsed ethernet interfaces
+    - name: Debug ethernet devices discovered
       debug:
-        var: iface_fact.results
+        var: eth_devs
 
-    - name: Set interface fact from first ethernet device found
+    - name: Fail if fewer than 2 ethernet NICs found
+      fail:
+        msg: "Need at least 2 ethernet NICs. Found={{ eth_devs | length }} ({{ eth_devs }})"
+      when: eth_devs | length < 2
+
+    - name: Select external/internal devices (first=external, second=internal)
       set_fact:
-        eth_iface: "{{ iface_fact.results 
-                   | rejectattr('skipped', 'defined') 
-                   | map(attribute='ansible_facts.eth_iface') 
-                   | first }}"      
+        eth_iface: "{{ eth_devs[0] }}"
+        eth_iface2: "{{ eth_devs[1] }}"
 
-    - name: Debug selected interface
+    - name: Debug selected devices
       debug:
-        var: eth_iface
+        msg:
+          - "Selected external device: {{ eth_iface }}"
+          - "Selected internal device: {{ eth_iface2 }}"
 
-    - name: Set interface fact from 2nd ethernet device found
+    # ----------------------------
+    # Map device -> connection profile name
+    # (nmcli con mod expects a CONNECTION name, not a DEVICE)
+    # ----------------------------
+    - name: List all NetworkManager connections (NAME:DEVICE)
+      command: nmcli -t -f NAME,DEVICE con show
+      register: nmcli_con_all
+      changed_when: false
+
+    - name: Set connection profile for external device
       set_fact:
-        eth_iface2: "{{ (iface_fact.results
-                        | rejectattr('skipped', 'defined')
-                        | map(attribute='ansible_facts.eth_iface')
-                        | list)[1] }}"
-      when: >
-        (iface_fact.results 
-        | rejectattr('skipped', 'defined') 
-        | map(attribute='ansible_facts.eth_iface') 
-        | list 
-        | length) >= 2   
+        ext_con: >-
+          {{
+            (
+              nmcli_con_all.stdout_lines
+              | select('search', ':' ~ eth_iface ~ '$')
+              | list
+              | first
+            )
+            | regex_replace(':' ~ eth_iface ~ '$', '')
+          }}
 
-    - name: Debug selected interface
+    - name: Set connection profile for internal device
+      set_fact:
+        int_con: >-
+          {{
+            (
+              nmcli_con_all.stdout_lines
+              | select('search', ':' ~ eth_iface2 ~ '$')
+              | list
+              | first
+            )
+            | regex_replace(':' ~ eth_iface2 ~ '$', '')
+          }}
+
+    - name: Debug selected connection profiles
       debug:
-        var: eth_iface2
+        msg:
+          - "External connection profile: {{ ext_con }} (device {{ eth_iface }})"
+          - "Internal connection profile: {{ int_con }} (device {{ eth_iface2 }})"
 
+    - name: Fail if external/internal connection profile could not be resolved
+      fail:
+        msg: >-
+          Could not resolve connection profile(s).
+          ext_con='{{ ext_con | default("") }}' int_con='{{ int_con | default("") }}'
+          nmcli con show output:
+          {{ nmcli_con_all.stdout_lines }}
+      when: (ext_con is not defined) or (ext_con | length == 0) or (int_con is not defined) or (int_con | length == 0)
+
+    # ----------------------------
+    # Configure external NIC
+    # ----------------------------
     - name: Configure external static IP using nmcli (manual method)
       command: >
-        nmcli con mod "{{ eth_iface }}"
+        nmcli con mod "{{ ext_con }}"
         ipv4.addresses "{{ external_address.ip }}/{{ netmask }}"
         ipv4.gateway "{{ external_address.gateway }}"
         ipv4.dns "{{ external_address.dns }}"
         ipv4.method manual
-    
+        connection.autoconnect yes
+
+    - name: Bring up external connection
+      command: nmcli con up "{{ ext_con }}"
+
+    # ----------------------------
+    # Configure internal NIC (no default route)
+    # ----------------------------
     - name: Configure internal static IP using nmcli (manual method)
       command: >
-        nmcli con mod "{{ eth_iface2 }}"
+        nmcli con mod "{{ int_con }}"
         ipv4.addresses "{{ internal_address.ip }}/{{ netmask }}"
         ipv4.method manual
-      # setting gateway adds a default route which annoying might take precedence over BRIDGED VMs internet access
+        ipv4.never-default yes
+        connection.autoconnect yes
+      # never-default prevents an internal default route from taking precedence
 
+    - name: Bring up internal connection
+      command: nmcli con up "{{ int_con }}"
+
+    # ----------------------------
+    # Reboot + verify
+    # ----------------------------
     - name: Reboot because it's cleaner
-      command: "reboot"
+      command: reboot
+      async: 1
+      poll: 0
       ignore_errors: true
-      # failures are thrown because it lost connection to the host immediately. Ignore them.
+      # SSH will drop immediately; ignore errors.
 
-    - name: Wait for network to stabilize
-      pause:
-        seconds: 60
+    - name: Wait for host to come back
+      wait_for_connection:
+        delay: 5
+        timeout: 300
 
-    - name: Confirm interface IP
+    - name: Confirm external interface IP
       command: ip -4 addr show dev "{{ eth_iface }}"
-      register: ip_check
+      register: ip_check_ext
+      changed_when: false
 
-    - name: Display assigned IP
+    - name: Confirm internal interface IP
+      command: ip -4 addr show dev "{{ eth_iface2 }}"
+      register: ip_check_int
+      changed_when: false
+
+    - name: Display assigned IPs
       debug:
-        var: ip_check.stdout_lines
+        msg:
+          - "External ({{ eth_iface }}):"
+          - "{{ ip_check_ext.stdout_lines }}"
+          - "Internal ({{ eth_iface2 }}):"
+          - "{{ ip_check_int.stdout_lines }}"

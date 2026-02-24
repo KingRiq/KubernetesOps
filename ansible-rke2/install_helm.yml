@@ -17,6 +17,9 @@
           - tar
           - jq
           - coreutils
+          - kernel-modules-extra
+          - kernel-core 
+          - kernel-modules
         state: present
 
     # - name: Get latest Helm version from Github

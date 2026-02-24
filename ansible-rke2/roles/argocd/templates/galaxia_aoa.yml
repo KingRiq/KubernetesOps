@@ -5,7 +5,7 @@ metadata:
   namespace: argocd
 spec:
   destination:
-    namespace: media-stack
+    namespace: cluster-utils
     server: https://kubernetes.default.svc
   project: default
   source:
@@ -17,5 +17,10 @@ spec:
   syncPolicy:
     automated:
       prune: true
+      selfHeal: true
+      allowEmpty: false   
     syncOptions:
       - CreateNamespace=true
+      - PruneLast=true                
+      - ApplyOutOfSyncOnly=true      
+      - PrunePropagationPolicy=foreground  
