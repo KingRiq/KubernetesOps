@@ -1,41 +1,8 @@
-replicaCount: 1
-
-# Bind directly to the VM/node network stack so it listens on 192.168.0.101
-hostNetwork: true
-dnsPolicy: ClusterFirstWithHostNet
-
-# Force it onto the VM that has 192.168.0.101
-nodeSelector:
-  kubernetes.io/hostname: manager2
-
-# If manager2 is a control-plane node, keep these tolerations; harmless otherwise
-tolerations:
-  - key: "node-role.kubernetes.io/control-plane"
-    operator: "Exists"
-    effect: "NoSchedule"
-  - key: "node-role.kubernetes.io/master"
-    operator: "Exists"
-    effect: "NoSchedule"
-
-# IMPORTANT: sysctls are NOT allowed when hostNetwork=true, so do not set them
-podSecurityContext: {}
-
-# Fix the "auto" image problem by explicitly setting hub/tag
-global:
-  hub: docker.io/istio
-  tag: 1.29.0
-
-# Keep service internal (you’re binding on the host IP, not via LB)
 service:
-  type: ClusterIP
+  type: LoadBalancer
 
-# Make sure the container can bind to 80/443 while staying non-root
-securityContext:
-  runAsNonRoot: true
-  runAsUser: 1337
-  runAsGroup: 1337
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
-  capabilities:
-    drop: ["ALL"]
-    add: ["NET_BIND_SERVICE"]
+# Stable names/labels make targeting simpler:
+labels:
+  istio: ingressgateway
+
+platform: openshift
