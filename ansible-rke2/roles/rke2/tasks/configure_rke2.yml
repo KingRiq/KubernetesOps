@@ -8,8 +8,8 @@
       node-ip: "{{ hostvars[groups['control'][0]].external_address.ip }}"
       tls-san:
         - "{{ hostvars[groups['control'][0]].external_address.ip }}"
-      # disable:
-      #   - rke2-ingress-nginx
+      disable:
+        - rke2-ingress-nginx
     mode: '0755'
   when: inventory_hostname == groups['control'][0]
 
@@ -91,6 +91,8 @@
       server: "https://{{ hostvars[groups['control'][0]].external_address.ip }}:9345"
       token: "{{ rke2_token }}"
       cluster-dns: 10.43.0.10
+      disable:
+        - rke2-ingress-nginx
     mode: '0755'
   when:
     - inventory_hostname in groups['control']
@@ -165,7 +167,7 @@
 - name: Add KUBECONFIG to root's .bashrc
   lineinfile:
     path: /root/.bashrc
-    regexp: '^e xport KUBECONFIG='
+    regexp: '^export KUBECONFIG='
     line: 'export KUBECONFIG=/etc/rancher/rke2/rke2.yaml'
     create: yes
 

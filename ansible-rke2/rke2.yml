@@ -19,7 +19,7 @@
   become: true
   roles:
     - role: certificate
-      when: state == 'absent'
+      when: state == 'export'
       tags:
         - certs
 

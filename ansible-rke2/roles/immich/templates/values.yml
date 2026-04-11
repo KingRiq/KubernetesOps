@@ -103,7 +103,7 @@ server:
   image:
     repository: ghcr.io/immich-app/immich-server
     tag: release
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   service:
     main:
       enabled: true
