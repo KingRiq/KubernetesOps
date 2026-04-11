@@ -5,6 +5,7 @@
     external_ip: "{{ hostvars[inventory_hostname].external_address.ip }}"
     internal_ip: "{{ hostvars[inventory_hostname].internal_address.ip }}"
     original_ip: "{{ ansible_host }}"
+    ansible_user: "{{ hostvars[inventory_hostname].ansible_user }}"
 
   tasks:
     - block:
@@ -39,7 +40,7 @@
               register: res_original_ip
               delegate_to: "{{ original_ip }}"
 
-            - name: Fallback - uUse Original IP
+            - name: Fallback - Use Original IP
               set_fact:
                 ansible_host: "{{ original_ip }}" 
 
