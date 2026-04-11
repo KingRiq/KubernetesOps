@@ -6,6 +6,7 @@ controllers:
       main:
         image:
           tag: release
+          pullPolicy: Always
         env:
           REDIS_HOSTNAME: immich-valkey
           # REDIS_HOST: immich-valkey
