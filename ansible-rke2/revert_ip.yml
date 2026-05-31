@@ -1,80 +1,180 @@
-# This playbook will set the specified host to a static ip address
-# utility for uniformity of the ip addresses
-
-#playbook to determine whether we are using the default ip or the static ip set
+# revert_ip.yml
+# This playbook reverts ethernet interfaces back to DHCP / automatic addressing.
 
 - import_playbook: evaluate_ip.yml
-- name: Set static IPs on Rocky Linux with dynamic interface detection
+
+- name: Revert Rocky Linux interfaces to DHCP with dynamic interface detection
   hosts: ClusterGroup
   become: yes
+  gather_facts: yes
+
   tasks:
-    - name: Find active ethernet interface
-      command: nmcli -t -f DEVICE,TYPE device status
+    - name: Find ethernet interfaces
+      ansible.builtin.command:
+        cmd: nmcli -t -f DEVICE,TYPE device status
       register: nmcli_output
+      changed_when: false
 
-    - name: Parse ethernet interface name
-      set_fact:
-        eth_iface: "{{ item.split(':')[0] }}"
-      loop: "{{ nmcli_output.stdout_lines }}"
-      when: "'ethernet' in item"
-      register: iface_fact
+    - name: Build list of ethernet interfaces
+      ansible.builtin.set_fact:
+        ethernet_ifaces: >-
+          {{
+            nmcli_output.stdout_lines
+            | select('search', ':ethernet$')
+            | map('split', ':')
+            | map('first')
+            | list
+          }}
 
-    - name: Debug parsed ethernet interfaces
-      debug:
-        var: iface_fact.results
+    - name: Fail if no ethernet interfaces were found
+      ansible.builtin.fail:
+        msg: "No ethernet interfaces found on {{ inventory_hostname }}"
+      when: ethernet_ifaces | length == 0
 
-    - name: Set interface fact from first ethernet device found
-      set_fact:
-        eth_iface: "{{ iface_fact.results 
-                   | rejectattr('skipped', 'defined') 
-                   | map(attribute='ansible_facts.eth_iface') 
-                   | first }}"   
+    - name: Set first ethernet interface
+      ansible.builtin.set_fact:
+        eth_iface: "{{ ethernet_ifaces[0] }}"
 
-    - name: Debug selected interface
-      debug:
-        var: eth_iface
+    - name: Set second ethernet interface if present
+      ansible.builtin.set_fact:
+        eth_iface2: "{{ ethernet_ifaces[1] }}"
+      when: ethernet_ifaces | length >= 2
 
-    - name: Set interface fact from 2nd ethernet device found
-      set_fact:
-        eth_iface2: "{{ (iface_fact.results
-                        | rejectattr('skipped', 'defined')
-                        | map(attribute='ansible_facts.eth_iface')
-                        | list)[1] }}"
-      when: >
-        (iface_fact.results 
-        | rejectattr('skipped', 'defined') 
-        | map(attribute='ansible_facts.eth_iface') 
-        | list 
-        | length) >= 2  
+    - name: Debug selected interfaces
+      ansible.builtin.debug:
+        msg:
+          - "eth_iface={{ eth_iface }}"
+          - "eth_iface2={{ eth_iface2 | default('not found') }}"
+          - "all ethernet interfaces={{ ethernet_ifaces }}"
 
-    - name: Debug selected interface
-      debug:
-        var: eth_iface2
+    - name: Get connection profile for first interface
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - -g
+          - GENERAL.CONNECTION
+          - device
+          - show
+          - "{{ eth_iface }}"
+      register: eth_conn
+      changed_when: false
 
-    - name: Configure External IP using nmcli (manual method)
-      command: >
-        nmcli con mod "{{ eth_iface }}" ipv4.method auto
-        ipv4.addresses ""
-        ipv4.gateway ""
-        ipv4.dns ""
+    - name: Get connection profile for second interface
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - -g
+          - GENERAL.CONNECTION
+          - device
+          - show
+          - "{{ eth_iface2 }}"
+      register: eth_conn2
+      changed_when: false
+      when: eth_iface2 is defined
 
-    - name: Configure Internal IP using nmcli (manual method)
-      command: >
-        nmcli con mod "{{ eth_iface2}}" ipv4.method auto
-        ipv4.addresses ""
-        ipv4.gateway ""
-        ipv4.dns ""
+    - name: Fail if first interface has no active NetworkManager connection
+      ansible.builtin.fail:
+        msg: "Interface {{ eth_iface }} has no active NetworkManager connection profile"
+      when: eth_conn.stdout | trim in ['', '--']
 
-    - name: Reboot
-      command: "reboot"
+    - name: Fail if second interface has no active NetworkManager connection
+      ansible.builtin.fail:
+        msg: "Interface {{ eth_iface2 }} has no active NetworkManager connection profile"
+      when:
+        - eth_iface2 is defined
+        - eth_conn2.stdout | trim in ['', '--']
+
+    - name: Debug selected connection profiles
+      ansible.builtin.debug:
+        msg:
+          - "{{ eth_iface }} uses connection profile '{{ eth_conn.stdout | trim }}'"
+          - "{{ eth_iface2 | default('not found') }} uses connection profile '{{ eth_conn2.stdout | default('not found') | trim }}'"
+
+    - name: Configure first interface for DHCP
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - con
+          - mod
+          - "{{ eth_conn.stdout | trim }}"
+          - ipv4.method
+          - auto
+          - ipv4.addresses
+          - ""
+          - ipv4.gateway
+          - ""
+          - ipv4.dns
+          - ""
+          - ipv4.never-default
+          - "no"
+          - connection.autoconnect
+          - "yes"
+
+    - name: Configure second interface for DHCP
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - con
+          - mod
+          - "{{ eth_conn2.stdout | trim }}"
+          - ipv4.method
+          - auto
+          - ipv4.addresses
+          - ""
+          - ipv4.gateway
+          - ""
+          - ipv4.dns
+          - ""
+          - ipv4.never-default
+          - "no"
+          - connection.autoconnect
+          - "yes"
+      when: eth_iface2 is defined
+
+    - name: Bring first connection up
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - con
+          - up
+          - "{{ eth_conn.stdout | trim }}"
+      async: 15
+      poll: 0
       ignore_errors: true
-      # failures are thrown because it lost connection to the host immediately. Ignore them.
+      ignore_errors: true
 
-        
-    - name: Confirm interface IP
-      command: ip -4 addr show dev "{{ eth_iface }}"
+    - name: Bring second connection up asynchronously
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - con
+          - up
+          - "{{ eth_conn2.stdout | trim }}"
+      when: eth_iface2 is defined
+      async: 15
+      poll: 0
+      ignore_errors: true
+
+- name: reget the ips bby
+  import_playbook: evaluate_ip.yml
+- name: teah
+  hosts: ClusterGroup
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Confirm first interface IP
+      ansible.builtin.command:
+        argv:
+          - ip
+          - -4
+          - addr
+          - show
+          - dev
+          - "{{ eth_iface }}"
       register: ip_check
+      changed_when: false
 
     - name: Display assigned IP
-      debug:
+      ansible.builtin.debug:
         var: ip_check.stdout_lines

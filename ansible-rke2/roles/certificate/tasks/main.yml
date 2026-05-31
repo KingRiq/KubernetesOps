@@ -1,5 +1,5 @@
 - include_tasks: export_certs.yml
-  when: state == 'absent'
+  when: state == 'export'
 
 - include_tasks: generate_certificate.yml
   when: state == 'present'
