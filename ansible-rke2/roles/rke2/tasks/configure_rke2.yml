@@ -76,15 +76,15 @@
     rke2_server_url: "https://{{ hostvars[groups['control'][0]].external_address.ip }}:9345"
   when: hostvars[groups['control'][0]].rke2_token is defined
 
-- name: Debug token on manager1
+- name: Debug token on manager
   debug:
     var: rke2_token
 
-- name: Debug token on manager1
+- name: Debug token on manager
   debug:
     var: rke2_server_url
 
-- name: Configure RKE2 server config on additional manager1s (join bootstrap)
+- name: Configure RKE2 server config on additional managers (join bootstrap)
   copy:
     dest: /etc/rancher/rke2/config.yaml
     content: |

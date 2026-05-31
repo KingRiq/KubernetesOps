@@ -6,8 +6,6 @@
   roles:
     - role: bootstrap_collections
       when: state == 'present'
-
-
     
 - import_playbook: evaluate_ip.yml
   tags:

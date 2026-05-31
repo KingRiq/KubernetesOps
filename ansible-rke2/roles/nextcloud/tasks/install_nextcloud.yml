@@ -52,7 +52,7 @@
     dest: /tmp/nextcloud-vs.yml
   delegate_to: "{{ item }}"
   loop: 
-    - 'manager1'
+    - 'manager'
     - 'localhost'
 
 - name: Deploy Nextcloud with Helm
@@ -62,7 +62,7 @@
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
 
 - name: Apply Nextcloud VirtualService
-  delegate_to: manager1
+  delegate_to: manager
   become: true
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"

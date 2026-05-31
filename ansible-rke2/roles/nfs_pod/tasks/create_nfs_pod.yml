@@ -12,12 +12,12 @@
 
 # rthen just copy the contents as text into a manifest directly... or you can just used template
 
-- name: Copy manifest to manager1
+- name: Copy manifest to manager
   ansible.builtin.copy:
     content: "{{ rendered_manifest }}"
     dest: "{{ manifest_remote_path }}"
     mode: "0644"
-  delegate_to: manager1
+  delegate_to: manager
 
 - name: Copy manifest to somewhere for repos
   ansible.builtin.copy:
@@ -69,15 +69,15 @@
     /var/lib/rancher/rke2/bin/kubectl -n storage delete deployment samba --ignore-not-found
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-  delegate_to: manager1
+  delegate_to: manager
 
-- name: Apply manifest on manager1
+- name: Apply manifest on manager
   become: yes
   command: >
     /var/lib/rancher/rke2/bin/kubectl apply -f {{ manifest_remote_path }}
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-  delegate_to: manager1
+  delegate_to: manager
   # when: inventory_hostname in groups['control']
 
 
