@@ -1,8 +1,8 @@
 all:
   hosts:
     manager:
-      ansible_host: 10.22.6.132
-      ansible_user: rocky9
+      ansible_host: 10.22.6.136
+      ansible_user: rocky10
       internal_address:
         ip: 10.22.6.100
         gateway: 10.22.6.1
@@ -12,7 +12,7 @@ all:
         gateway: 192.168.0.2
         dns: 192.168.0.2
     worker1:
-      ansible_host: 10.22.6.130
+      ansible_host: 10.22.6.133
       ansible_user: rocky10
       internal_address:
         ip: 10.22.6.101
@@ -23,7 +23,7 @@ all:
         gateway: 192.168.0.2
         dns: 192.168.0.2
     worker2:
-      ansible_host: 10.22.6.141
+      ansible_host: 10.22.6.134
       ansible_user: rocky10
       internal_address:
         ip: 10.22.6.102
@@ -75,3 +75,7 @@ control:
 workers:
   hosts:
     worker[1:2]:
+
+storage:
+  hosts:
+    worker1:
