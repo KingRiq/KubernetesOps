@@ -1,36 +1,34 @@
 ---
 - import_playbook: evaluate_ip.yml
-- name: Unmount and clean up SMB share from Linux nodes
+
+- name: Force cleanup network mounts
   hosts: all
-  become: yes
-  vars:
-    fstype: "cifs"
+  become: true
+  gather_facts: false
 
   tasks:
-    - name: Unmount the SMB share if mounted
-      mount:
-        path: "{{ mount_point }}/{{ item.mount_name }}"
-        fstype: "{{ fstype }}"
-        state: absent
-      loop: "{{ smb_domains }}"
+    - name: Lazy unmount SMB shares if stuck
+      ansible.builtin.command:
+        cmd: "umount -l {{ mount_point }}/{{ item.mount_name }}"
+      loop: "{{ smb_domains | default([]) }}"
+      failed_when: false
+      changed_when: true
 
-    - name: Remove fstab entry (if it exists)
-      mount:
+    - name: Lazy unmount NFS share if stuck
+      ansible.builtin.command:
+        cmd: "umount -l {{ mount_point }}"
+      failed_when: false
+      changed_when: true
+
+    - name: Remove SMB shares from fstab
+      ansible.posix.mount:
         path: "{{ mount_point }}/{{ item.mount_name }}"
-        fstype: "{{ fstype }}"
+        fstype: "cifs"
         state: absent_from_fstab
-      loop: "{{ smb_domains }}"
-    
-    - name: Unmount the nfs share if mounted
-      mount:
+      loop: "{{ smb_domains | default([]) }}"
+
+    - name: Remove NFS share from fstab
+      ansible.posix.mount:
         path: "{{ mount_point }}"
         fstype: "nfs"
         state: absent_from_fstab
-
-    - name: Unmount the NFS share if mounted
-      mount:
-        path: "{{ mount_point }}"
-        fstype: "nfs"
-        state: absent
-
-    

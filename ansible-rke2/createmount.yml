@@ -1,9 +1,10 @@
 ---
+
+- import_playbook: evaluate_ip.yml
 - name: Create mount point and run script
   hosts: storage
   become: true
   gather_facts: false
-
   vars:
     script_path: "/tmp/myscript.sh"
 
