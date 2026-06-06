@@ -18,42 +18,10 @@ controllers:
         envFrom:
           - secretRef:
               name: immich-secrets
-        probes:
-          startup:
-            enabled: true
-            spec:
-              httpGet:
-                path: /api/server/ping
-                port: 2283
-              failureThreshold: 60
-              periodSeconds: 10
-              timeoutSeconds: 5
-
-          readiness:
-            enabled: true
-            spec:
-              httpGet:
-                path: /api/server/ping
-                port: 2283
-              initialDelaySeconds: 30
-              periodSeconds: 10
-              timeoutSeconds: 5
-              failureThreshold: 6
-
-          liveness:
-            enabled: true
-            spec:
-              httpGet:
-                path: /api/server/ping
-                port: 2283
-              initialDelaySeconds: 120
-              periodSeconds: 30
-              timeoutSeconds: 10
-              failureThreshold: 6
         resources:
           requests:
-            cpu: 2
-            memory: 2Gi
+            cpu: 500m
+            memory: 1Gi
           limits:
             cpu: 4
             memory: 4Gi
@@ -137,6 +105,45 @@ server:
     repository: ghcr.io/immich-app/immich-server
     tag: release
     pullPolicy: Always
+  controllers:
+    main:
+      containers:
+        main:
+          probes:
+            startup:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /api/server/ping
+                  port: 2283
+                failureThreshold: 60
+                periodSeconds: 10
+                timeoutSeconds: 5
+
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /api/server/ping
+                  port: 2283
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                timeoutSeconds: 5
+                failureThreshold: 6
+
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /api/server/ping
+                  port: 2283
+                initialDelaySeconds: 120
+                periodSeconds: 30
+                timeoutSeconds: 10
+                failureThreshold: 6
   service:
     main:
       enabled: true
