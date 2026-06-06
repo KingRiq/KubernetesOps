@@ -18,6 +18,38 @@ controllers:
         envFrom:
           - secretRef:
               name: immich-secrets
+        probes:
+          startup:
+            enabled: true
+            spec:
+              httpGet:
+                path: /api/server/ping
+                port: 2283
+              failureThreshold: 60
+              periodSeconds: 10
+              timeoutSeconds: 5
+
+          readiness:
+            enabled: true
+            spec:
+              httpGet:
+                path: /api/server/ping
+                port: 2283
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              timeoutSeconds: 5
+              failureThreshold: 6
+
+          liveness:
+            enabled: true
+            spec:
+              httpGet:
+                path: /api/server/ping
+                port: 2283
+              initialDelaySeconds: 120
+              periodSeconds: 30
+              timeoutSeconds: 10
+              failureThreshold: 6
         resources:
           requests:
             cpu: 2
