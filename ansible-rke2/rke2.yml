@@ -17,13 +17,14 @@
   become: true
   roles:
     - role: certificate
-      when: state == 'export'
+      when: state == 'exported'
       tags:
         - certs
 
 - import_playbook: install_helm.yml
   tags:
     - rke2
+    - helm
 
 - name: "{{ state }}ing RKE2 nodes "
   hosts: ClusterGroup
