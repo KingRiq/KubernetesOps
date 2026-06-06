@@ -35,7 +35,7 @@ mariadb:
     tag: 12.0.2-debian-12-r0
 
 nextcloud:
-  host: 192.168.50.222         
+  host: 192.168.150.222         
   existingSecret:
     enabled: true
     secretName: nextcloud-secrets
@@ -43,7 +43,7 @@ nextcloud:
     passwordKey: password
   
   trustedDomains:             
-    - 192.168.50.222
+    - 192.168.150.222
     - cloud.chaoscauldron.space
     - nextcloud.default.svc
     - nextcloud.default.svc.cluster.local
@@ -86,7 +86,7 @@ persistence:
  
 service:
   type: LoadBalancer
-  loadBalancerIP: 192.168.50.222
+  loadBalancerIP: 192.168.150.222
   port: 80
   targetPort: 80
 
