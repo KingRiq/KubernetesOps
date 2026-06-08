@@ -53,21 +53,21 @@
 #     metallb_controller.resources[0].status.readyReplicas is defined and
 #     metallb_controller.resources[0].status.readyReplicas | int >= 1
 
-# - name: Wait for MetalLB controller pods to be ready
-#   kubernetes.core.k8s_info:
-#     kubeconfig: "{{ kubeconfig }}"
-#     namespace: "{{ metallb_namespace }}"
-#     kind: Pod
-#     label_selectors:
-#       - "app=metallb"
-#       - "component=controller"
-#   register: metallb_pods
-#   until: metallb_pods.resources | length > 0 and
-#          (metallb_pods.resources |
-#           map(attribute='status.containerStatuses') | flatten |
-#           map(attribute='ready') | select('equalto', true) | list | length) > 0
-#   retries: 20
-#   delay: 15
+- name: Wait for MetalLB controller pods to be ready
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    namespace: "{{ metallb_namespace }}"
+    kind: Pod
+    label_selectors:
+      - "app=metallb"
+      - "component=controller"
+  register: metallb_pods
+  until: metallb_pods.resources | length > 0 and
+         (metallb_pods.resources |
+          map(attribute='status.containerStatuses') | flatten |
+          map(attribute='ready') | select('equalto', true) | list | length) > 0
+  retries: 20
+  delay: 15
 
 - name: Wait for MetalLB webhook service to have endpoints
   kubernetes.core.k8s_info:
