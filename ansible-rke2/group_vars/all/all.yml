@@ -27,6 +27,18 @@ rke_ports:
     protocol: udp 
   - port: 53      # desc: "DNS (CoreDNS)" }
     protocol: tcp 
+  - port: 80
+    protocol: tcp
+  - port: 443
+    protocol: tcp
+  - port: 80
+    protocol: udp
+  - port: 443
+    protocol: udp
+  - port: 8080
+    protocol: tcp
+  - port: 8080
+    protocol: udp
 
 # The node that owns the USB/external hard drive
 storage_host_path: /mnt/windows/share/
