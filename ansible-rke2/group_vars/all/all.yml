@@ -23,10 +23,6 @@ rke_ports:
     protocol: tcp 
   - port: 10256   # desc: "kube-proxy health check" }
     protocol: tcp 
-  - port: 53      # dsc: "DNS (CoreDNS)" }  
-    protocol: udp 
-  - port: 53      # desc: "DNS (CoreDNS)" }
-    protocol: tcp 
   - port: 80
     protocol: tcp
   - port: 443
