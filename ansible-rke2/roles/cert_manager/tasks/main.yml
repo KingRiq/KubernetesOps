@@ -79,6 +79,16 @@
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
   when: "tls_secret_check.rc !=0 and crt_file.stat.exists and key_file.stat.exists"
 
+- name: Create TLS secret for rancherusing kubectl
+  ansible.builtin.command: >
+    /var/lib/rancher/rke2/bin/kubectl create secret tls tls-rancher-ingress
+    --cert="{{cert_crt_path}}"
+    --key="{{cert_key_path}}"
+    -n cattle-system
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  when: "tls_secret_check.rc !=0 and crt_file.stat.exists and key_file.stat.exists"
+
 # Cert should be properly created now but register failures
 - name: Verify Cert exists now
   ansible.builtin.command: >

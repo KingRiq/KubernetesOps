@@ -1,17 +1,40 @@
----
-
-# - name: Gather service facts
-#   ansible.builtin.service_facts:
-
-# - name: Debug service facts
-#   debug:
-#     var: ansible_facts.services
-
-
 - name: Unmount all NFS and CIFS mounts
   become: true
   shell: |
     umount -a -t nfs4,nfs,cifs,smbfs -f -l
+
+- name: Unmount all NFS and CIFS mounts
+  become: true
+  shell: |
+    umount -af
+  failed_when: false
+
+- name: Stop RKE2 services before Longhorn cleanup
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+  loop:
+    - rke2-server
+    - rke2-agent
+  failed_when: false
+
+- name: Kill Longhorn, kubelet, and containerd leftovers
+  become: true
+  ansible.builtin.shell: |
+    pkill -9 -f longhorn || true
+    pkill -9 -f engine-manager || true
+    pkill -9 -f instance-manager || true
+    pkill -9 -f share-manager || true
+    pkill -9 -f longhorn-csi || true
+    pkill -9 -f kubelet || true
+    pkill -9 -f containerd-shim || true
+    pkill -9 -f containerd || true
+    pkill -9 -f rke2 || true
+  args:
+    executable: /bin/bash
+  changed_when: true
+  failed_when: false
 
 - name: KILLEMALL!!
   become: true
@@ -21,19 +44,43 @@
   command: /usr/bin/rke2-uninstall.sh
   register: uninstall_result
   failed_when: false
-  ignore_errors: true
-  #incase it wasn't installed properly
 
-- name: Kill processes holding on to kubelet dir
-  shell: "fuser -k /var/lib/kubelet || true"
+- name: Kill leftover RKE2/containerd/kubelet processes
+  become: true
+  ansible.builtin.shell: |
+    sudo systemctl stop rke2-server rke2-agent 2>/dev/null || true
+    pkill -9 -f rke2 || true
+    pkill -9 -f kubelet || true
+    pkill -9 -f containerd-shim || true
+    pkill -9 -f containerd || true
+  args:
+    executable: /bin/bash
+  changed_when: true
+  failed_when: false
+
+- name: Lazy unmount kubelet mountpoints
+  become: true
+  ansible.builtin.shell: |
+    timeout 60s bash -c '
+      findmnt -R /var/lib/kubelet -n -o TARGET 2>/dev/null \
+        | sort -r \
+        | while read -r target; do
+            umount -lf "$target" 2>/dev/null || true
+          done
+    '
+  args:
+    executable: /bin/bash
+  changed_when: true
+  failed_when: false
 
 - name: Remove known RKE2 files and directories
-  file:
+  become: true
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop: "{{ rke2_cleanup_paths }}"
 
-- include_role: 
+- include_role:
     name: firewall
   vars:
     firewall_ports: "{{ rke_ports }}"
@@ -47,4 +94,3 @@
   debug:
     msg: "Remaining open ports: {{ remaining_ports.stdout }}"
   when: remaining_ports.stdout | length > 0
-
