@@ -19,7 +19,7 @@ fi
 
 REAL_DEVICE="$(readlink -f "$DEVICE")"
 
-echo "Using device: $DEVICE"
+echo "Using by-id device: $DEVICE"
 echo "Currently resolves to: $REAL_DEVICE"
 echo
 
@@ -37,6 +37,35 @@ if [ "$FSTYPE" != "xfs" ]; then
 fi
 
 echo "$REAL_DEVICE is XFS."
+echo
+
+echo "=== Getting filesystem UUID ==="
+
+UUID="$(blkid -s UUID -o value "$REAL_DEVICE" 2>/dev/null || true)"
+
+if [ -z "$UUID" ]; then
+  echo "ERROR: No UUID found on $REAL_DEVICE"
+  blkid "$REAL_DEVICE" || true
+  exit 1
+fi
+
+echo "UUID: $UUID"
+echo
+
+echo "=== Checking for duplicate UUIDs ==="
+
+mapfile -t UUID_MATCHES < <(blkid -t UUID="$UUID" -o device 2>/dev/null | sort -u || true)
+
+if [ "${#UUID_MATCHES[@]}" -gt 1 ]; then
+  echo "ERROR: More than one block device has UUID=$UUID"
+  echo "This is unsafe for UUID mounting:"
+  printf '  %s\n' "${UUID_MATCHES[@]}"
+  echo
+  echo "Do not continue until the duplicate UUID problem is fixed."
+  exit 1
+fi
+
+echo "UUID is unique."
 echo
 
 echo "=== Unmounting old mounts ==="
@@ -77,18 +106,65 @@ fi
 
 echo
 
-echo "=== Updating /etc/fstab ==="
+echo "=== Updating /etc/fstab to use UUID ==="
 
-sed -i "\|[[:space:]]$MOUNTPOINT[[:space:]]|d" /etc/fstab
-sed -i "\|LABEL=$LABEL[[:space:]]|d" /etc/fstab
-sed -i "\|/dev/sd[a-z][0-9][[:space:]]$MOUNTPOINT[[:space:]]|d" /etc/fstab
+FSTAB_BACKUP="/etc/fstab.bak.$(date +%Y%m%d-%H%M%S)"
+cp -a /etc/fstab "$FSTAB_BACKUP"
+echo "Backed up /etc/fstab to: $FSTAB_BACKUP"
 
-echo "$DEVICE  $MOUNTPOINT  xfs  defaults,noatime,nofail,nouuid  0  0" >> /etc/fstab
+TMP_FSTAB="$(mktemp)"
+
+awk \
+  -v mp="$MOUNTPOINT" \
+  -v uuid="UUID=$UUID" \
+  -v label="LABEL=$LABEL" \
+  -v dev="$DEVICE" \
+  -v real="$REAL_DEVICE" '
+  /^[[:space:]]*#/ {
+    print
+    next
+  }
+
+  NF == 0 {
+    print
+    next
+  }
+
+  $2 == mp {
+    next
+  }
+
+  $1 == uuid {
+    next
+  }
+
+  $1 == label {
+    next
+  }
+
+  $1 == dev {
+    next
+  }
+
+  $1 == real {
+    next
+  }
+
+  {
+    print
+  }
+' /etc/fstab > "$TMP_FSTAB"
+
+cat "$TMP_FSTAB" > /etc/fstab
+rm -f "$TMP_FSTAB"
+
+echo "UUID=$UUID  $MOUNTPOINT  xfs  defaults,noatime,nofail  0  0" >> /etc/fstab
 
 systemctl daemon-reload
 
+echo
 echo "New fstab entry:"
-grep "$MOUNTPOINT" /etc/fstab
+grep -F "$MOUNTPOINT" /etc/fstab
 echo
 
 echo "=== Mounting drive ==="
@@ -96,6 +172,10 @@ echo "=== Mounting drive ==="
 if ! mount "$MOUNTPOINT"; then
   echo
   echo "ERROR: Mount failed."
+  echo "Restoring previous /etc/fstab from backup."
+  cp -a "$FSTAB_BACKUP" /etc/fstab
+  systemctl daemon-reload
+  echo
   echo "Recent kernel messages:"
   dmesg -T | tail -100
   exit 1
@@ -108,8 +188,21 @@ echo "=== Verifying mount ==="
 findmnt "$MOUNTPOINT"
 echo
 
+MOUNT_SOURCE="$(findmnt -rn "$MOUNTPOINT" -o SOURCE || true)"
+MOUNT_SOURCE_REAL="$(readlink -f "$MOUNT_SOURCE" 2>/dev/null || echo "$MOUNT_SOURCE")"
+
+echo "Mounted source: $MOUNT_SOURCE"
+echo "Mounted source resolves to: $MOUNT_SOURCE_REAL"
+echo "Expected device: $REAL_DEVICE"
+echo
+
+if [ "$MOUNT_SOURCE_REAL" != "$REAL_DEVICE" ]; then
+  echo "WARNING: Mount source does not resolve to expected device."
+  echo "This may be normal if findmnt reports UUID/LABEL mapper paths, but verify carefully."
+fi
+
 echo "=== Contents ==="
 ls -lah "$MOUNTPOINT"
 
 echo
-echo "SUCCESS: $DEVICE is mounted at $MOUNTPOINT"
+echo "SUCCESS: UUID=$UUID is mounted at $MOUNTPOINT"

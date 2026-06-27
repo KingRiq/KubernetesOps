@@ -44,7 +44,12 @@
       when: state == 'present'
       tags:
         - metallb
-        
+
+- import_playbook: createmount.yml
+  tags:
+    - nfs
+  when: state == 'present'
+  
 - import_playbook: deploy_storage.yml
   tags:
     - nfs
