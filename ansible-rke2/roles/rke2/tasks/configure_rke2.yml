@@ -157,6 +157,16 @@
     group: root
     mode: '0755'
 
+- name: Install passwordless sudoers file
+  become: true
+  template:
+    src: 99-nopasswd-sudo.j2
+    dest: /etc/sudoers.d/99-nopasswd-sudo
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
 - name: Add RKE2 bin directory to root's .bashrc
   lineinfile:
     path: /root/.bashrc
@@ -170,4 +180,3 @@
     regexp: '^export KUBECONFIG='
     line: 'export KUBECONFIG=/etc/rancher/rke2/rke2.yaml'
     create: yes
-

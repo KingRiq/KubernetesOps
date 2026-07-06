@@ -25,4 +25,6 @@ done
 
 findmnt -R /var/lib/kubelet/pods || echo "No remaining mounts under /var/lib/kubelet/pods"
 
+rm -rf /var/lib/longhorn/
+
 
