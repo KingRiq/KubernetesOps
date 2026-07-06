@@ -4,7 +4,7 @@
 
 - import_playbook: evaluate_ip.yml
 
-- name: Set static IPs on Rocky Linux with dynamic interface detection
+- name: Set static IPs on Rocky Linux with safe interface detection
   hosts: ClusterGroup
   become: yes
   gather_facts: no
@@ -45,10 +45,152 @@
         msg: "Need at least 2 ethernet NICs. Found={{ eth_devs | length }} {{ eth_devs }}"
       when: eth_devs | length < 2
 
-    - name: Select external/internal devices
+    # ----------------------------
+    # Determine external/internal devices safely
+    # No MACs.
+    # No eth_devs[0] / eth_devs[1] guessing.
+    # ----------------------------
+    - name: Build subnet prefixes from intended static IPs
       ansible.builtin.set_fact:
-        eth_iface: "{{ eth_devs[0] }}"
-        eth_iface2: "{{ eth_devs[1] }}"
+        internal_prefix: "{{ internal_address.ip | regex_replace('\\.[0-9]+$', '.') }}"
+        external_prefix: "{{ external_address.ip | regex_replace('\\.[0-9]+$', '.') }}"
+
+    - name: Debug intended subnet prefixes
+      ansible.builtin.debug:
+        msg:
+          - "Internal prefix: {{ internal_prefix }}"
+          - "External prefix: {{ external_prefix }}"
+
+    - name: Detect external/internal NICs by current IP/default route
+      ansible.builtin.shell: |
+        set -euo pipefail
+
+        DEVS="{{ eth_devs | join(' ') }}"
+        INTERNAL_PREFIX="{{ internal_prefix }}"
+        EXTERNAL_PREFIX="{{ external_prefix }}"
+
+        internal_iface=""
+        external_iface=""
+
+        echo "Detected ethernet devices: ${DEVS}" >&2
+        echo "Internal prefix: ${INTERNAL_PREFIX}" >&2
+        echo "External prefix: ${EXTERNAL_PREFIX}" >&2
+
+        # Prefer the current default route as external if present.
+        default_dev="$(ip route show default 2>/dev/null | awk '{print $5; exit}' || true)"
+
+        if [ -n "${default_dev}" ]; then
+          for dev in ${DEVS}; do
+            if [ "${dev}" = "${default_dev}" ]; then
+              external_iface="${dev}"
+              echo "External candidate from default route: ${external_iface}" >&2
+            fi
+          done
+        fi
+
+        # Classify devices by existing IPv4 addresses.
+        for dev in ${DEVS}; do
+          ips="$(ip -o -4 addr show dev "${dev}" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 || true)"
+
+          for ip in ${ips}; do
+            echo "${dev} has IPv4 ${ip}" >&2
+
+            case "${ip}" in
+              ${INTERNAL_PREFIX}*)
+                if [ -n "${internal_iface}" ] && [ "${internal_iface}" != "${dev}" ]; then
+                  echo "ERROR: Multiple internal candidates: ${internal_iface}, ${dev}" >&2
+                  exit 1
+                fi
+                internal_iface="${dev}"
+                ;;
+              ${EXTERNAL_PREFIX}*)
+                if [ -n "${external_iface}" ] && [ "${external_iface}" != "${dev}" ]; then
+                  echo "ERROR: Multiple external candidates: ${external_iface}, ${dev}" >&2
+                  exit 1
+                fi
+                external_iface="${dev}"
+                ;;
+            esac
+          done
+        done
+
+        # If exactly two NICs exist and one side is known, infer the other.
+        dev_count="$(printf '%s\n' ${DEVS} | sed '/^$/d' | wc -l)"
+
+        if [ "${dev_count}" = "2" ]; then
+          if [ -n "${internal_iface}" ] && [ -z "${external_iface}" ]; then
+            for dev in ${DEVS}; do
+              if [ "${dev}" != "${internal_iface}" ]; then
+                external_iface="${dev}"
+                echo "External inferred as other NIC: ${external_iface}" >&2
+              fi
+            done
+          fi
+
+          if [ -n "${external_iface}" ] && [ -z "${internal_iface}" ]; then
+            for dev in ${DEVS}; do
+              if [ "${dev}" != "${external_iface}" ]; then
+                internal_iface="${dev}"
+                echo "Internal inferred as other NIC: ${internal_iface}" >&2
+              fi
+            done
+          fi
+        fi
+
+        if [ -z "${internal_iface}" ] || [ -z "${external_iface}" ]; then
+          echo "ERROR: Could not determine both NICs safely." >&2
+          echo "internal_iface=${internal_iface}" >&2
+          echo "external_iface=${external_iface}" >&2
+          echo "devices=${DEVS}" >&2
+          echo "Current IPv4 addresses:" >&2
+          ip -o -4 addr show >&2 || true
+          echo "Current routes:" >&2
+          ip route >&2 || true
+          exit 1
+        fi
+
+        if [ "${internal_iface}" = "${external_iface}" ]; then
+          echo "ERROR: Internal and external resolved to same NIC: ${internal_iface}" >&2
+          exit 1
+        fi
+
+        echo "internal_iface=${internal_iface}"
+        echo "external_iface=${external_iface}"
+      args:
+        executable: /bin/bash
+      register: detected_nics
+      changed_when: false
+
+    - name: Set selected device facts
+      ansible.builtin.set_fact:
+        eth_iface: >-
+          {{
+            detected_nics.stdout_lines
+            | select('match', '^external_iface=')
+            | list
+            | first
+            | default('external_iface=')
+            | regex_replace('^external_iface=', '')
+          }}
+        eth_iface2: >-
+          {{
+            detected_nics.stdout_lines
+            | select('match', '^internal_iface=')
+            | list
+            | first
+            | default('internal_iface=')
+            | regex_replace('^internal_iface=', '')
+          }}
+
+    - name: Fail if selected devices are invalid
+      ansible.builtin.fail:
+        msg: >-
+          Invalid selected NICs.
+          external={{ eth_iface }}
+          internal={{ eth_iface2 }}
+          detected={{ detected_nics.stdout_lines }}
+      when:
+        - eth_iface == "" or eth_iface2 == "" or eth_iface == eth_iface2
 
     - name: Debug selected devices
       ansible.builtin.debug:
@@ -57,48 +199,91 @@
           - "Selected internal device: {{ eth_iface2 }}"
 
     # ----------------------------
-    # Resolve device -> active connection profile
-    # nmcli con mod requires CONNECTION name, not DEVICE name.
+    # Create stable NetworkManager profiles.
+    # Do not rely on GENERAL.CONNECTION because disconnected NICs return '--'.
     # ----------------------------
-    - name: Get NetworkManager connection profile for external device
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - -g
-          - GENERAL.CONNECTION
-          - device
-          - show
-          - "{{ eth_iface }}"
-      register: ext_con_raw
+    - name: Delete stale external profile if bound to wrong interface
+      ansible.builtin.shell: |
+        set -euo pipefail
+
+        if nmcli -t -f NAME con show | grep -Fxq "external"; then
+          current_if="$(nmcli -g connection.interface-name con show external || true)"
+
+          if [ "${current_if}" != "{{ eth_iface }}" ]; then
+            nmcli con delete external
+          fi
+        fi
+      args:
+        executable: /bin/bash
       changed_when: false
 
-    - name: Get NetworkManager connection profile for internal device
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - -g
-          - GENERAL.CONNECTION
-          - device
-          - show
-          - "{{ eth_iface2 }}"
-      register: int_con_raw
+    - name: Delete stale internal profile if bound to wrong interface
+      ansible.builtin.shell: |
+        set -euo pipefail
+
+        if nmcli -t -f NAME con show | grep -Fxq "internal"; then
+          current_if="$(nmcli -g connection.interface-name con show internal || true)"
+
+          if [ "${current_if}" != "{{ eth_iface2 }}" ]; then
+            nmcli con delete internal
+          fi
+        fi
+      args:
+        executable: /bin/bash
       changed_when: false
+
+    - name: Ensure external connection profile exists
+      ansible.builtin.shell: |
+        set -euo pipefail
+
+        if ! nmcli -t -f NAME con show | grep -Fxq "external"; then
+          nmcli con add type ethernet ifname "{{ eth_iface }}" con-name external
+        fi
+
+        nmcli con mod external connection.interface-name "{{ eth_iface }}"
+      args:
+        executable: /bin/bash
+      register: ensure_external_con
+      changed_when: "'successfully added' in ensure_external_con.stdout or 'successfully added' in ensure_external_con.stderr"
+
+    - name: Ensure internal connection profile exists
+      ansible.builtin.shell: |
+        set -euo pipefail
+
+        if ! nmcli -t -f NAME con show | grep -Fxq "internal"; then
+          nmcli con add type ethernet ifname "{{ eth_iface2 }}" con-name internal
+        fi
+
+        nmcli con mod internal connection.interface-name "{{ eth_iface2 }}"
+      args:
+        executable: /bin/bash
+      register: ensure_internal_con
+      changed_when: "'successfully added' in ensure_internal_con.stdout or 'successfully added' in ensure_internal_con.stderr"
 
     - name: Set connection profile facts
       ansible.builtin.set_fact:
-        ext_con: "{{ ext_con_raw.stdout | trim }}"
-        int_con: "{{ int_con_raw.stdout | trim }}"
+        ext_con: "external"
+        int_con: "internal"
 
-    - name: Fail if external/internal connection profile could not be resolved
-      ansible.builtin.fail:
-        msg: >-
-          Could not resolve connection profile(s).
-          ext_con='{{ ext_con }}'
-          int_con='{{ int_con }}'
-          external_device='{{ eth_iface }}'
-          internal_device='{{ eth_iface2 }}'
-      when:
-        - ext_con in ['', '--'] or int_con in ['', '--']
+    - name: Disable old ethernet profiles attached to these NICs
+      ansible.builtin.shell: |
+        set -euo pipefail
+
+        nmcli -t -f NAME,TYPE con show | while IFS=: read -r name type; do
+          [ "${type}" = "802-3-ethernet" ] || continue
+          [ "${name}" = "external" ] && continue
+          [ "${name}" = "internal" ] && continue
+
+          profile_if="$(nmcli -g connection.interface-name con show "${name}" || true)"
+
+          if [ "${profile_if}" = "{{ eth_iface }}" ] || [ "${profile_if}" = "{{ eth_iface2 }}" ]; then
+            echo "Disabling autoconnect for stale profile ${name} on ${profile_if}"
+            nmcli con mod "${name}" connection.autoconnect no
+          fi
+        done
+      args:
+        executable: /bin/bash
+      changed_when: false
 
     - name: Debug selected connection profiles
       ansible.builtin.debug:
@@ -117,6 +302,8 @@
           - con
           - mod
           - "{{ ext_con }}"
+          - connection.interface-name
+          - "{{ eth_iface }}"
           - ipv4.addresses
           - "{{ external_address.ip }}/{{ netmask }}"
           - ipv4.gateway
@@ -127,6 +314,10 @@
           - manual
           - ipv4.never-default
           - "no"
+          - ipv4.ignore-auto-dns
+          - "no"
+          - ipv6.method
+          - disabled
           - connection.autoconnect
           - "yes"
 
@@ -141,53 +332,63 @@
           - con
           - mod
           - "{{ int_con }}"
+          - connection.interface-name
+          - "{{ eth_iface2 }}"
           - ipv4.addresses
           - "{{ internal_address.ip }}/{{ netmask }}"
           - ipv4.gateway
           - ""
-          - ipv4.dns
-          - "{{ internal_address.dns }}"
           - ipv4.method
           - manual
           - ipv4.never-default
           - "yes"
+          - ipv4.ignore-auto-dns
+          - "yes"
+          - ipv6.method
+          - disabled
           - connection.autoconnect
           - "yes"
 
     # ----------------------------
     # Apply connections
-    # ---------------------------
-    - name: Bring first connection up asynchronously
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - con
-          - up
-          - "{{ ext_con }}"
-      async: 15
-      poll: 0
-      ignore_errors: true
-
-    - name: Bring second connection up asynchronously
+    # Bring internal first, external second.
+    # External owns the default route.
+    # ----------------------------
+    - name: Bring internal connection up asynchronously
       ansible.builtin.command:
         argv:
           - nmcli
           - con
           - up
           - "{{ int_con }}"
-      async: 15
+      async: 20
       poll: 0
       ignore_errors: true
 
-- name: reget the ips bby
+    - name: Bring external connection up asynchronously
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - con
+          - up
+          - "{{ ext_con }}"
+      async: 20
+      poll: 0
+      ignore_errors: true
+
+    - name: Wait a few seconds for NetworkManager to apply changes
+      ansible.builtin.pause:
+        seconds: 8
+
+- name: Re-detect reachable IPs after network changes
   import_playbook: evaluate_ip.yml
-- name: teah
+
+- name: Confirm static network configuration
   hosts: ClusterGroup
   become: yes
   gather_facts: yes
-  
-  tasks:
 
+  tasks:
     - name: Confirm external interface IP
       ansible.builtin.command:
         argv:
@@ -231,3 +432,42 @@
     - name: Display routes
       ansible.builtin.debug:
         var: route_check.stdout_lines
+
+    - name: Verify default route uses external interface
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ip route show default | awk '{print $5}'
+      args:
+        executable: /bin/bash
+      register: default_route_devs
+      changed_when: false
+
+    - name: Fail if default route is not on external interface
+      ansible.builtin.fail:
+        msg: >-
+          Default route is not on external interface.
+          Expected={{ eth_iface }}
+          Actual default route devices={{ default_route_devs.stdout_lines }}
+          Routes={{ route_check.stdout_lines }}
+      when: eth_iface not in default_route_devs.stdout_lines
+
+    - name: Fail if internal interface has default route
+      ansible.builtin.fail:
+        msg: >-
+          Internal interface {{ eth_iface2 }} has a default route.
+          Routes={{ route_check.stdout_lines }}
+      when: eth_iface2 in default_route_devs.stdout_lines
+
+    - name: Test external gateway reachability
+      ansible.builtin.command:
+        argv:
+          - ping
+          - -c
+          - "3"
+          - "{{ external_address.gateway }}"
+      register: gateway_ping
+      changed_when: false
+
+    - name: Display gateway ping
+      ansible.builtin.debug:
+        var: gateway_ping.stdout_lines
