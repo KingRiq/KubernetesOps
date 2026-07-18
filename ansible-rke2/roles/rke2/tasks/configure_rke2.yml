@@ -160,7 +160,7 @@
 - name: Install passwordless sudoers file
   become: true
   template:
-    src: 99-nopasswd-sudo.j2
+    src: templates/nopassword-sudo.j2
     dest: /etc/sudoers.d/99-nopasswd-sudo
     owner: root
     group: root
