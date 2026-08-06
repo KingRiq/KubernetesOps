@@ -1,7 +1,9 @@
 ---
-- name: Configure RKE2 server with ServiceLB enabled
-  copy:
+- name: Configure initial RKE2 server
+  become: true
+  ansible.builtin.copy:
     dest: /etc/rancher/rke2/config.yaml
+    mode: "0755"
     content: |
       cluster-init: true
       cluster-dns: 10.43.0.10
@@ -10,7 +12,13 @@
         - "{{ hostvars[groups['control'][0]].external_address.ip }}"
       disable:
         - rke2-ingress-nginx
-    mode: '0755'
+      kube-apiserver-arg:
+        - "default-not-ready-toleration-seconds=0"
+        - "default-unreachable-toleration-seconds=0"
+      kube-controller-manager-arg:
+        - "node-monitor-grace-period=50s"
+        - "node-monitor-period=2s"
+        - "node-eviction-rate=1"
   when: inventory_hostname == groups['control'][0]
 
 
