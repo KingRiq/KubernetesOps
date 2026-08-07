@@ -6,7 +6,7 @@ Expect plenty of commented-out code and experiments while I refine things — I�
 ---
 
 ## TODO
-- [x] Think of a proper website (I don’t want to host on GitHub Pages — that feels too limited). Hosted on chaoscauldron.space atm
+- [x] Think of a proper website (I don’t want to host on GitHub Pages — that feels too limited). Hosted on moonlightgrove.love atm
 - [] clean up network file shares so I don't accidentally delete my entire cloud by accident ( unacceptable )
 - [] better storage methodologies  
 

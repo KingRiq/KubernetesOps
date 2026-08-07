@@ -9,10 +9,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - "*.chaoscauldron.space"
+    - "*.moonlightgrove.love"
     secretName: galaxia-tls
   rules:
-  - host: "*.chaoscauldron.space"
+  - host: "*.moonlightgrove.love"
     http:
       paths:
       - path: /

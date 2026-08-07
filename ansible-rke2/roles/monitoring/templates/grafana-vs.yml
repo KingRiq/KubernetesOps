@@ -5,7 +5,7 @@ metadata:
   namespace: networking
 spec:
   hosts:
-    - grafana.chaoscauldron.space
+    - grafana.moonlightgrove.love
   gateways:
     - networking/galaxia-gateway
   http:

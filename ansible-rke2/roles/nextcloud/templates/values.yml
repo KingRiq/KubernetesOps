@@ -44,7 +44,7 @@ nextcloud:
   
   trustedDomains:             
     - 192.168.0.222
-    - cloud.chaoscauldron.space
+    - cloud.moonlightgrove.love
     - nextcloud.default.svc
     - nextcloud.default.svc.cluster.local
   podSecurityContext:

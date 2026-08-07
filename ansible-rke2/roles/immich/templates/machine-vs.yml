@@ -5,7 +5,7 @@ metadata:
   namespace: networking
 spec:
   hosts:
-    - ml.chaoscauldron.space
+    - ml.moonlightgrove.love
   gateways:
     - networking/galaxia-gateway  # should already be defined 
   http:

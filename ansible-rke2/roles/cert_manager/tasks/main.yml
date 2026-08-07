@@ -114,11 +114,11 @@
 - include_role:
     name: certificate
   vars: 
-    secret_name: "galaxia-intra-tls"
+    secret_name: "galaxia-tls"
     dnsNamesList:
-      - "*.chaoscauldron.space"
-      - "chaoscauldron.space"
-      - "*.home"
+      - "*.moonlightgrove.love"
+      - "moonlightgrove.love"
+      # - "*.home"
     certificate_name: galaxia-god-cert
   # if we didn't already have a good cert or we want for some reason a signed one
   when: "(tls_secret_verify.rc == 1 or not crt_file.stat.exists or not key_file.stat.exists) or (self_signed is defined and self_signed == 'true')"

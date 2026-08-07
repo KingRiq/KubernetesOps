@@ -55,15 +55,15 @@ tls_servers:
       mode: SIMPLE
       credentialName: galaxia-tls
     hosts:
-      - "*.chaoscauldron.space"
-      - "chaoscauldron.space"
+      - "*.moonlightgrove.love"
+      - "moonlightgrove.love"
   - port:
       number: 80
       name: http-galaxia
       protocol: HTTP
     hosts:
-      - "*.chaoscauldron.space"
-      - "chaoscauldron.space"
+      - "*.moonlightgrove.love"
+      - "moonlightgrove.love"
     tls:
       httpsRedirect: false
 
