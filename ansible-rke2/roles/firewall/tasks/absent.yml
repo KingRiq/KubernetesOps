@@ -1,8 +1,7 @@
-- name: Close all open ports
-  firewalld:
-    zone: public
-    port: "{{ item.port }}/{{ item.protocol }}" 
-    permanent: true
-    immediate: yes
-    state: disabled
-  loop: "{{ firewall_ports }}"
+- name: Close required firewall ports
+  ansible.builtin.shell: >
+    firewall-cmd --permanent --zone=public
+    {% for item in firewall_ports %}
+    --remove-port={{ item.port }}/{{ item.protocol }}
+    {% endfor %}
+    && firewall-cmd --reload

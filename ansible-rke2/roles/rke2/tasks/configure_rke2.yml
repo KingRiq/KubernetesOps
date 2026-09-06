@@ -11,7 +11,8 @@
       tls-san:
         - "{{ hostvars[groups['control'][0]].external_address.ip }}"
       disable:
-        - rke2-ingress-nginx
+        - rke2-traefik
+      ingress-controller: none
       kube-apiserver-arg:
         - "default-not-ready-toleration-seconds=0"
         - "default-unreachable-toleration-seconds=0"
@@ -19,6 +20,9 @@
         - "node-monitor-grace-period=50s"
         - "node-monitor-period=2s"
         - "node-eviction-rate=1"
+        - "volume-host-fault-timeout=15s" 
+
+      
   when: inventory_hostname == groups['control'][0]
 
 
@@ -100,7 +104,16 @@
       token: "{{ rke2_token }}"
       cluster-dns: 10.43.0.10
       disable:
-        - rke2-ingress-nginx
+        - rke2-traefik
+      ingress-controller: none
+      kube-apiserver-arg:
+        - "default-not-ready-toleration-seconds=0"
+        - "default-unreachable-toleration-seconds=0"
+      kube-controller-manager-arg:
+        - "node-monitor-grace-period=50s"
+        - "node-monitor-period=2s"
+        - "node-eviction-rate=1"
+        - "volume-host-fault-timeout=15s"
     mode: '0755'
   when:
     - inventory_hostname in groups['control']

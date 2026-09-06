@@ -1,180 +1,71 @@
-# revert_ip.yml
-# This playbook reverts ethernet interfaces back to DHCP / automatic addressing.
-
+---
 - import_playbook: evaluate_ip.yml
 
-- name: Revert Rocky Linux interfaces to DHCP with dynamic interface detection
+
+- name: Revert networking to DHCP
   hosts: ClusterGroup
   become: yes
-  gather_facts: yes
+  gather_facts: no
 
   tasks:
-    - name: Find ethernet interfaces
-      ansible.builtin.command:
-        cmd: nmcli -t -f DEVICE,TYPE device status
-      register: nmcli_output
-      changed_when: false
 
-    - name: Build list of ethernet interfaces
-      ansible.builtin.set_fact:
-        ethernet_ifaces: >-
-          {{
-            nmcli_output.stdout_lines
-            | select('search', ':ethernet$')
-            | map('split', ':')
-            | map('first')
-            | list
-          }}
+    - name: Revert network interfaces to DHCP
+      ansible.builtin.shell: |
+        set -e
 
-    - name: Fail if no ethernet interfaces were found
-      ansible.builtin.fail:
-        msg: "No ethernet interfaces found on {{ inventory_hostname }}"
-      when: ethernet_ifaces | length == 0
+        HAS_INTERNAL="{{ 'yes' if internal_address is defined else 'no' }}"
 
-    - name: Set first ethernet interface
-      ansible.builtin.set_fact:
-        eth_iface: "{{ ethernet_ifaces[0] }}"
+        INTERFACES=""
 
-    - name: Set second ethernet interface if present
-      ansible.builtin.set_fact:
-        eth_iface2: "{{ ethernet_ifaces[1] }}"
-      when: ethernet_ifaces | length >= 2
+        if [ "$HAS_INTERNAL" = "yes" ]; then
 
-    - name: Debug selected interfaces
-      ansible.builtin.debug:
-        msg:
-          - "eth_iface={{ eth_iface }}"
-          - "eth_iface2={{ eth_iface2 | default('not found') }}"
-          - "all ethernet interfaces={{ ethernet_ifaces }}"
+          for dev in $(nmcli -t -f DEVICE,TYPE device status |
+            awk -F: '$2=="ethernet" || $2=="wifi" {print $1}'); do
 
-    - name: Get connection profile for first interface
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - -g
-          - GENERAL.CONNECTION
-          - device
-          - show
-          - "{{ eth_iface }}"
-      register: eth_conn
-      changed_when: false
+            if [ -e "/sys/class/net/$dev/device" ]; then
+              INTERFACES="$INTERFACES $dev"
+            fi
 
-    - name: Get connection profile for second interface
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - -g
-          - GENERAL.CONNECTION
-          - device
-          - show
-          - "{{ eth_iface2 }}"
-      register: eth_conn2
-      changed_when: false
-      when: eth_iface2 is defined
+          done
 
-    - name: Fail if first interface has no active NetworkManager connection
-      ansible.builtin.fail:
-        msg: "Interface {{ eth_iface }} has no active NetworkManager connection profile"
-      when: eth_conn.stdout | trim in ['', '--']
+        else
 
-    - name: Fail if second interface has no active NetworkManager connection
-      ansible.builtin.fail:
-        msg: "Interface {{ eth_iface2 }} has no active NetworkManager connection profile"
-      when:
-        - eth_iface2 is defined
-        - eth_conn2.stdout | trim in ['', '--']
+          INTERFACES=$(ip route show default | awk '{print $5; exit}')
 
-    - name: Debug selected connection profiles
-      ansible.builtin.debug:
-        msg:
-          - "{{ eth_iface }} uses connection profile '{{ eth_conn.stdout | trim }}'"
-          - "{{ eth_iface2 | default('not found') }} uses connection profile '{{ eth_conn2.stdout | default('not found') | trim }}'"
+        fi
 
-    - name: Configure first interface for DHCP
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - con
-          - mod
-          - "{{ eth_conn.stdout | trim }}"
-          - ipv4.method
-          - auto
-          - ipv4.addresses
-          - ""
-          - ipv4.gateway
-          - ""
-          - ipv4.dns
-          - ""
-          - ipv4.never-default
-          - "no"
-          - connection.autoconnect
-          - "yes"
 
-    - name: Configure second interface for DHCP
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - con
-          - mod
-          - "{{ eth_conn2.stdout | trim }}"
-          - ipv4.method
-          - auto
-          - ipv4.addresses
-          - ""
-          - ipv4.gateway
-          - ""
-          - ipv4.dns
-          - ""
-          - ipv4.never-default
-          - "no"
-          - connection.autoconnect
-          - "yes"
-      when: eth_iface2 is defined
+        if [ -z "$INTERFACES" ]; then
+          echo "Could not determine network interfaces"
+          exit 1
+        fi
 
-    - name: Bring first connection up
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - con
-          - up
-          - "{{ eth_conn.stdout | trim }}"
-      async: 15
-      poll: 0
-      ignore_errors: true
-      ignore_errors: true
 
-    - name: Bring second connection up asynchronously
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - con
-          - up
-          - "{{ eth_conn2.stdout | trim }}"
-      when: eth_iface2 is defined
-      async: 15
-      poll: 0
-      ignore_errors: true
+        for dev in $INTERFACES; do
 
-- name: reget the ips bby
-  import_playbook: evaluate_ip.yml
-- name: teah
-  hosts: ClusterGroup
-  become: yes
-  gather_facts: yes
+          PROFILE=$(nmcli -g GENERAL.CONNECTION device show "$dev" | head -1)
 
-  tasks:
-    - name: Confirm first interface IP
-      ansible.builtin.command:
-        argv:
-          - ip
-          - -4
-          - addr
-          - show
-          - dev
-          - "{{ eth_iface }}"
-      register: ip_check
-      changed_when: false
+          if [ -z "$PROFILE" ] || [ "$PROFILE" = "--" ]; then
+            continue
+          fi
 
-    - name: Display assigned IP
-      ansible.builtin.debug:
-        var: ip_check.stdout_lines
+          nmcli con mod "$PROFILE" \
+            ipv4.method auto \
+            ipv4.addresses "" \
+            ipv4.gateway "" \
+            ipv4.dns "" \
+            ipv4.never-default no \
+            ipv4.ignore-auto-dns no \
+            connection.autoconnect yes
+
+          systemd-run \
+            --on-active=3s \
+            /bin/bash -c "nmcli con up '$PROFILE'" \
+            >/dev/null
+
+        done
+
+      args:
+        executable: /bin/bash
+
+      throttle: 1

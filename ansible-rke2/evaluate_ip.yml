@@ -1,56 +1,80 @@
+---
 - name: Evaluating IP of hosts
   hosts: ClusterGroup
   gather_facts: no
-  vars:
-    external_ip: "{{ hostvars[inventory_hostname].external_address.ip }}"
-    internal_ip: "{{ hostvars[inventory_hostname].internal_address.ip }}"
-    original_ip: "{{ ansible_host }}"
-    ansible_user: "{{ hostvars[inventory_hostname].ansible_user }}"
 
   tasks:
-    - block:
-      - name: Verify SSH via Internal IP
-        wait_for_connection:
-          timeout: 1
-        register: res_internal
-        delegate_to: "{{ internal_ip }}"
 
-      - name: Fallback - Use internal IP
-        set_fact:
-          ansible_host: "{{ internal_ip }}"
-        when: res_internal is succeeded
-    
-      rescue:
-        - block:
-          - name: Verify SSH via External IP
-            wait_for_connection:
-              timeout: 1
-            register: res_external
-            delegate_to: "{{ external_ip }}"
+    - name: Save original IP
+      ansible.builtin.set_fact:
+        original_ip: "{{ ansible_host }}"
 
-          - name: Set SSH to External IP
-            set_fact:
-              ansible_host: "{{ external_ip }}"
-            when: res_external is succeeded
 
-          rescue:
-            - name: Verify SSH via Originally Configured IP
-              wait_for_connection:
-                timeout: 1
-              register: res_original_ip
-              delegate_to: "{{ original_ip }}"
+    - name: Try original IP
+      ansible.builtin.wait_for_connection:
+        timeout: 3
+        connect_timeout: 2
+      delegate_to: "{{ original_ip }}"
+      vars:
+        ansible_user: "{{ hostvars[inventory_hostname].ansible_user }}"
+      register: original_test
+      ignore_errors: yes
 
-            - name: Fallback - Use Original IP
-              set_fact:
-                ansible_host: "{{ original_ip }}" 
 
-            - name: Nothing is reachable give up bruh
-              fail:
-                msg: >-
-                  Nothing is reachable give up bruh
-              when: res_original_ip is failed   
-        
+    - name: Try external IP
+      ansible.builtin.wait_for_connection:
+        timeout: 3
+        connect_timeout: 2
+      delegate_to: "{{ external_address.ip }}"
+      vars:
+        ansible_user: "{{ hostvars[inventory_hostname].ansible_user }}"
+      register: external_test
+      ignore_errors: yes
+      when: original_test is failed
 
-    - name: Confirm final ansible_host
-      debug:
-        msg: "Using connection host {{ ansible_host }}"
+
+    - name: Use external IP
+      ansible.builtin.set_fact:
+        ansible_host: "{{ external_address.ip }}"
+      when:
+        - original_test is failed
+        - external_test is succeeded
+
+
+    - name: Try internal IP
+      ansible.builtin.wait_for_connection:
+        timeout: 3
+        connect_timeout: 2
+      delegate_to: "{{ internal_address.ip }}"
+      vars:
+        ansible_user: "{{ hostvars[inventory_hostname].ansible_user }}"
+      register: internal_test
+      ignore_errors: yes
+      when:
+        - original_test is failed
+        - external_test is failed
+        - internal_address is defined
+
+
+    - name: Use internal IP
+      ansible.builtin.set_fact:
+        ansible_host: "{{ internal_address.ip }}"
+      when:
+        - original_test is failed
+        - external_test is failed
+        - internal_address is defined
+        - internal_test is succeeded
+
+
+    - name: Fail if host is unreachable
+      ansible.builtin.fail:
+        msg: "Could not reach {{ inventory_hostname }} on any configured IP."
+      when:
+        - original_test is failed
+        - external_test is failed
+        - internal_address is not defined or internal_test is failed
+
+
+    - name: Show selected IP
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} -> {{ ansible_host }}"
