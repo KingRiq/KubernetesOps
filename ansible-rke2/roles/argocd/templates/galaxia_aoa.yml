@@ -24,3 +24,4 @@ spec:
       - PruneLast=true                
       - ApplyOutOfSyncOnly=true      
       - PrunePropagationPolicy=foreground  
+      - SkipDryRunOnWaiting=true

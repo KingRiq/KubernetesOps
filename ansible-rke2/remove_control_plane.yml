@@ -1,0 +1,876 @@
+---
+- import_playbook: evaluate_ip.yml
+
+
+- name: Permanently remove RKE2 control-plane node
+  hosts: ClusterGroup
+  become: true
+  serial: 1
+
+  vars:
+    kubectl_bin: /var/lib/rancher/rke2/bin/kubectl
+    kubeconfig: /etc/rancher/rke2/rke2.yaml
+
+    etcdctl_bin: /var/lib/rancher/rke2/bin/etcdctl
+    etcd_endpoint: https://127.0.0.1:2379
+    etcd_cacert: /var/lib/rancher/rke2/server/tls/etcd/server-ca.crt
+    etcd_cert: /var/lib/rancher/rke2/server/tls/etcd/server-client.crt
+    etcd_key: /var/lib/rancher/rke2/server/tls/etcd/server-client.key
+
+
+  pre_tasks:
+
+    #################################################################
+    # REQUIRE EXPLICIT TARGET
+    #################################################################
+
+    - name: Require Ansible limit
+      ansible.builtin.assert:
+        that:
+          - ansible_limit is defined
+          - ansible_limit | length > 0
+        fail_msg: >-
+          You must specify the node to remove with -l.
+
+          Example:
+
+          ansible-playbook -i inventory/Galaxia.yml
+          remove_control_plane.yml -l worker2
+
+
+    #################################################################
+    # SELECT SURVIVING CONTROL PLANE
+    #
+    # Target does NOT need to currently exist in groups['control'].
+    #################################################################
+
+    - name: Build surviving control-plane list
+      ansible.builtin.set_fact:
+        surviving_control_nodes: >-
+          {{
+            groups['control']
+            | default([])
+            | difference([inventory_hostname])
+          }}
+
+
+    - name: Verify a surviving control plane exists
+      ansible.builtin.assert:
+        that:
+          - surviving_control_nodes | length > 0
+        fail_msg: >-
+          No surviving control-plane node is available to perform
+          cluster-side removal operations.
+
+
+    - name: Select surviving control plane
+      ansible.builtin.set_fact:
+        control_node: "{{ surviving_control_nodes | first }}"
+
+
+    - name: Set surviving control-plane IP
+      ansible.builtin.set_fact:
+        control_node_ip: "{{ hostvars[control_node].external_address.ip }}"
+
+
+    - name: Display removal plan
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "CONTROL-PLANE REMOVAL"
+          - "=============================================="
+          - "Removing: {{ inventory_hostname }}"
+          - "Target IP: {{ hostvars[inventory_hostname].external_address.ip }}"
+          - "Cluster operations through: {{ control_node }}"
+          - "Control IP: {{ control_node_ip }}"
+          - "Surviving controls: {{ surviving_control_nodes }}"
+          - "=============================================="
+
+
+    #################################################################
+    # VERIFY SURVIVING KUBERNETES API
+    #################################################################
+
+    - name: Verify surviving Kubernetes API
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - get
+          - --raw=/readyz
+      delegate_to: "{{ control_node_ip }}"
+      register: control_ready
+      changed_when: false
+
+
+    - name: Verify surviving control plane is healthy
+      ansible.builtin.assert:
+        that:
+          - control_ready.rc == 0
+          - control_ready.stdout | trim == 'ok'
+        fail_msg: >-
+          {{ control_node }} at {{ control_node_ip }}
+          is not a healthy Kubernetes control plane.
+
+
+    #################################################################
+    # VERIFY ETCDCTL
+    #################################################################
+
+    - name: Check etcdctl on surviving control plane
+      ansible.builtin.stat:
+        path: "{{ etcdctl_bin }}"
+      delegate_to: "{{ control_node_ip }}"
+      register: etcdctl_status
+
+
+    - name: Require etcdctl
+      ansible.builtin.assert:
+        that:
+          - etcdctl_status.stat.exists
+        fail_msg: >-
+          {{ etcdctl_bin }} does not exist on {{ control_node }}.
+
+
+  tasks:
+
+    #################################################################
+    # DRAIN TARGET
+    #################################################################
+
+    - name: Drain target node
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - drain
+          - "{{ inventory_hostname }}"
+          - --ignore-daemonsets
+          - --delete-emptydir-data
+          - --force
+          - --timeout=600s
+      delegate_to: "{{ control_node_ip }}"
+      register: drain_result
+      changed_when: drain_result.rc == 0
+      failed_when: >-
+        drain_result.rc != 0 and
+        'not found' not in drain_result.stderr
+
+
+    - name: Display drain result
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            drain_result.stdout
+            if drain_result.stdout | length > 0
+            else drain_result.stderr
+          }}
+
+
+    #################################################################
+    # GET CURRENT ETCD MEMBERSHIP
+    #################################################################
+
+    - name: Get etcd member list
+      ansible.builtin.command:
+        argv:
+          - "{{ etcdctl_bin }}"
+          - --endpoints={{ etcd_endpoint }}
+          - --cacert={{ etcd_cacert }}
+          - --cert={{ etcd_cert }}
+          - --key={{ etcd_key }}
+          - member
+          - list
+          - --write-out=json
+      delegate_to: "{{ control_node_ip }}"
+      register: etcd_members_raw
+      changed_when: false
+
+
+    - name: Parse etcd member list
+      ansible.builtin.set_fact:
+        etcd_members: "{{ (etcd_members_raw.stdout | from_json).members }}"
+
+
+    - name: Find target etcd member
+      ansible.builtin.set_fact:
+        target_etcd_members: >-
+          {{
+            etcd_members
+            | selectattr(
+                'name',
+                'match',
+                '^' + inventory_hostname + '(-.*)?$'
+              )
+            | list
+          }}
+
+
+    #################################################################
+    # ETCD MATCH VALIDATION
+    #
+    # 0 = already removed
+    # 1 = normal
+    # >1 = ambiguous
+    #################################################################
+
+    - name: Verify etcd member match is unambiguous
+      ansible.builtin.assert:
+        that:
+          - target_etcd_members | length <= 1
+        fail_msg: >-
+          Found {{ target_etcd_members | length }} etcd members
+          matching {{ inventory_hostname }}. Refusing to guess.
+
+
+    - name: Report already removed etcd member
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} is already absent from etcd.
+          Continuing cleanup.
+      when: target_etcd_members | length == 0
+
+
+    #################################################################
+    # CONVERT ETCD MEMBER ID
+    #
+    # JSON returns decimal.
+    # etcdctl member remove expects hexadecimal.
+    #################################################################
+
+    - name: Set target etcd member information
+      ansible.builtin.set_fact:
+        target_etcd_member_id: >-
+          {{ '%x' | format(target_etcd_members[0].ID | int) }}
+        target_etcd_member_name: "{{ target_etcd_members[0].name }}"
+      when: target_etcd_members | length == 1
+
+
+    - name: Display target etcd member
+      ansible.builtin.debug:
+        msg:
+          - "Target: {{ inventory_hostname }}"
+          - "etcd member: {{ target_etcd_member_name }}"
+          - "etcd member ID: {{ target_etcd_member_id }}"
+      when: target_etcd_members | length == 1
+
+
+    #################################################################
+    # REMOVE ETCD MEMBERSHIP FIRST
+    #################################################################
+
+    - name: Remove target from etcd cluster
+      ansible.builtin.command:
+        argv:
+          - "{{ etcdctl_bin }}"
+          - --endpoints={{ etcd_endpoint }}
+          - --cacert={{ etcd_cacert }}
+          - --cert={{ etcd_cert }}
+          - --key={{ etcd_key }}
+          - member
+          - remove
+          - "{{ target_etcd_member_id }}"
+      delegate_to: "{{ control_node_ip }}"
+      register: etcd_remove
+      changed_when: true
+      when: target_etcd_members | length == 1
+
+
+    - name: Display etcd removal result
+      ansible.builtin.debug:
+        var: etcd_remove.stdout_lines
+      when: target_etcd_members | length == 1
+
+
+    #################################################################
+    # VERIFY ETCD MEMBERSHIP IS GONE
+    #################################################################
+
+    - name: Get etcd member list after removal
+      ansible.builtin.command:
+        argv:
+          - "{{ etcdctl_bin }}"
+          - --endpoints={{ etcd_endpoint }}
+          - --cacert={{ etcd_cacert }}
+          - --cert={{ etcd_cert }}
+          - --key={{ etcd_key }}
+          - member
+          - list
+          - --write-out=json
+      delegate_to: "{{ control_node_ip }}"
+      register: etcd_after_removal_raw
+      changed_when: false
+
+
+    - name: Parse etcd member list after removal
+      ansible.builtin.set_fact:
+        etcd_after_removal: >-
+          {{
+            (etcd_after_removal_raw.stdout | from_json).members
+          }}
+
+
+    - name: Verify target is absent from etcd
+      ansible.builtin.assert:
+        that:
+          - >-
+            (
+              etcd_after_removal
+              | selectattr(
+                  'name',
+                  'match',
+                  '^' + inventory_hostname + '(-.*)?$'
+                )
+              | list
+              | length
+            ) == 0
+        fail_msg: >-
+          {{ inventory_hostname }} is still an etcd member.
+
+
+    #################################################################
+    # STOP TARGET RKE2 SERVER
+    #################################################################
+
+    - name: Stop and disable RKE2 server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: stopped
+        enabled: false
+      register: rke2_server_stop
+      failed_when: false
+
+
+    - name: Check for RKE2 killall script
+      ansible.builtin.stat:
+        path: /usr/local/bin/rke2-killall.sh
+      register: rke2_killall
+
+
+    - name: Kill remaining RKE2 processes
+      ansible.builtin.command:
+        cmd: /usr/local/bin/rke2-killall.sh
+      when: rke2_killall.stat.exists
+      changed_when: true
+
+
+    #################################################################
+    # WAIT FOR LONGHORN ADMISSION WEBHOOK
+    #################################################################
+
+    - name: Wait for Longhorn admission webhook endpoints
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - -n
+          - longhorn-system
+          - get
+          - endpoints
+          - longhorn-admission-webhook
+          - -o
+          - jsonpath={.subsets[*].addresses[*].ip}
+      delegate_to: "{{ control_node_ip }}"
+      register: longhorn_webhook_endpoints
+      changed_when: false
+      failed_when: false
+      retries: 12
+      delay: 5
+      until: >-
+        longhorn_webhook_endpoints.rc == 0 and
+        longhorn_webhook_endpoints.stdout | trim | length > 0
+
+
+    - name: Display Longhorn admission webhook endpoints
+      ansible.builtin.debug:
+        msg: >-
+          Longhorn admission webhook endpoints:
+          {{ longhorn_webhook_endpoints.stdout | default('') }}
+
+
+    #################################################################
+    # CHECK WHETHER LONGHORN NODE EXISTS
+    #################################################################
+
+    - name: Check whether target exists in Longhorn
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - -n
+          - longhorn-system
+          - get
+          - nodes.longhorn.io
+          - "{{ inventory_hostname }}"
+      delegate_to: "{{ control_node_ip }}"
+      register: initial_longhorn_node
+      failed_when: false
+      changed_when: false
+
+
+    - name: Report already removed Longhorn node
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} is already absent from Longhorn.
+          Continuing cleanup.
+      when: initial_longhorn_node.rc != 0
+
+
+    #################################################################
+    # DISABLE LONGHORN SCHEDULING
+    #################################################################
+
+    - name: Disable Longhorn scheduling on target
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - -n
+          - longhorn-system
+          - patch
+          - nodes.longhorn.io
+          - "{{ inventory_hostname }}"
+          - --type=merge
+          - -p
+          - '{"spec":{"allowScheduling":false}}'
+      delegate_to: "{{ control_node_ip }}"
+      register: longhorn_disable
+      changed_when: longhorn_disable.rc == 0
+      when: initial_longhorn_node.rc == 0
+
+
+    #################################################################
+    # FIND LONGHORN REPLICAS ASSIGNED TO TARGET
+    #################################################################
+
+    - name: Get Longhorn replicas
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - -n
+          - longhorn-system
+          - get
+          - replicas.longhorn.io
+          - -o
+          - json
+      delegate_to: "{{ control_node_ip }}"
+      register: longhorn_replicas_raw
+      changed_when: false
+      when: initial_longhorn_node.rc == 0
+
+
+    - name: Build Longhorn replica list for target
+      ansible.builtin.set_fact:
+        target_longhorn_replicas: >-
+          {{
+            (longhorn_replicas_raw.stdout | from_json)['items']
+            | selectattr('spec.nodeID', 'equalto', inventory_hostname)
+            | map(attribute='metadata.name')
+            | list
+          }}
+      when: initial_longhorn_node.rc == 0
+
+
+    - name: Display Longhorn replicas being removed
+      ansible.builtin.debug:
+        msg:
+          - "Longhorn node: {{ inventory_hostname }}"
+          - "Replicas found: {{ target_longhorn_replicas | length }}"
+          - "Replicas: {{ target_longhorn_replicas }}"
+      when: initial_longhorn_node.rc == 0
+
+
+    #################################################################
+    # DELETE LONGHORN REPLICA CRs
+    #################################################################
+
+    - name: Delete Longhorn replicas assigned to target
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - -n
+          - longhorn-system
+          - delete
+          - replicas.longhorn.io
+          - "{{ item }}"
+          - --ignore-not-found=true
+          - --wait=false
+      delegate_to: "{{ control_node_ip }}"
+      loop: "{{ target_longhorn_replicas | default([]) }}"
+      register: longhorn_replica_delete
+      changed_when: true
+      when:
+        - initial_longhorn_node.rc == 0
+        - target_longhorn_replicas | default([]) | length > 0
+
+
+    #################################################################
+    # WAIT UNTIL LONGHORN REPLICAS ARE GONE
+    #################################################################
+
+    - name: Wait for Longhorn replicas to disappear from target
+      ansible.builtin.shell: |
+        set -o pipefail
+
+        {{ kubectl_bin }} \
+          --kubeconfig {{ kubeconfig }} \
+          -n longhorn-system \
+          get replicas.longhorn.io \
+          -o jsonpath='{range .items[?(@.spec.nodeID=="{{ inventory_hostname }}")]}{.metadata.name}{"\n"}{end}'
+      args:
+        executable: /bin/bash
+      delegate_to: "{{ control_node_ip }}"
+      register: remaining_longhorn_replicas
+      changed_when: false
+      retries: 30
+      delay: 2
+      until: remaining_longhorn_replicas.stdout | trim | length == 0
+      when: initial_longhorn_node.rc == 0
+
+
+    #################################################################
+    # DELETE KUBERNETES NODE
+    #
+    # IMPORTANT:
+    # This happens BEFORE deleting the Longhorn Node CR.
+    #
+    # Longhorn refuses Node CR deletion while it still considers the
+    # Kubernetes node Ready.
+    #################################################################
+
+    - name: Delete target Kubernetes node
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - delete
+          - node
+          - "{{ inventory_hostname }}"
+          - --ignore-not-found=true
+      delegate_to: "{{ control_node_ip }}"
+      register: kubernetes_delete
+      changed_when: true
+
+
+    #################################################################
+    # WAIT FOR KUBERNETES NODE TO DISAPPEAR
+    #################################################################
+
+    - name: Wait for Kubernetes node to disappear
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - get
+          - node
+          - "{{ inventory_hostname }}"
+      delegate_to: "{{ control_node_ip }}"
+      register: kubernetes_check
+      failed_when: false
+      changed_when: false
+      retries: 30
+      delay: 2
+      until: kubernetes_check.rc != 0
+
+
+    - name: Verify Kubernetes node was removed
+      ansible.builtin.assert:
+        that:
+          - kubernetes_check.rc != 0
+        fail_msg: >-
+          {{ inventory_hostname }} still exists in Kubernetes.
+
+
+    #################################################################
+    # WAIT FOR LONGHORN TO NOTICE THE KUBERNETES NODE IS GONE
+    #
+    # Longhorn may take a few seconds to change its Ready condition
+    # after the Kubernetes Node object disappears.
+    #################################################################
+
+    - name: Wait for Longhorn node to become not ready
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - -n
+          - longhorn-system
+          - get
+          - nodes.longhorn.io
+          - "{{ inventory_hostname }}"
+          - -o
+          - json
+      delegate_to: "{{ control_node_ip }}"
+      register: longhorn_node_state
+      failed_when: false
+      changed_when: false
+      retries: 30
+      delay: 2
+      until: >-
+        longhorn_node_state.rc != 0 or
+        (
+          (
+            (longhorn_node_state.stdout | from_json)['status']['conditions']
+            | selectattr('type', 'equalto', 'Ready')
+            | map(attribute='status')
+            | first
+            | default('False')
+          ) != 'True'
+        )
+      when: initial_longhorn_node.rc == 0
+
+
+    #################################################################
+    # DELETE LONGHORN NODE CR
+    #
+    # At this point:
+    #
+    #   scheduling = false
+    #   replicas   = 0
+    #   engines    = 0
+    #   k8s node   = gone
+    #   ready      = false
+    #################################################################
+
+    - name: Delete target from Longhorn
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - -n
+          - longhorn-system
+          - delete
+          - nodes.longhorn.io
+          - "{{ inventory_hostname }}"
+          - --ignore-not-found=true
+          - --wait=true
+          - --timeout=120s
+      delegate_to: "{{ control_node_ip }}"
+      register: longhorn_delete
+      changed_when: true
+      when: initial_longhorn_node.rc == 0
+
+
+    #################################################################
+    # VERIFY LONGHORN NODE IS GONE
+    #################################################################
+
+    - name: Check whether Longhorn node still exists
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - -n
+          - longhorn-system
+          - get
+          - nodes.longhorn.io
+          - "{{ inventory_hostname }}"
+      delegate_to: "{{ control_node_ip }}"
+      register: longhorn_check
+      failed_when: false
+      changed_when: false
+      retries: 12
+      delay: 5
+      until: longhorn_check.rc != 0
+
+
+    - name: Verify Longhorn node was removed
+      ansible.builtin.assert:
+        that:
+          - longhorn_check.rc != 0
+        fail_msg: >-
+          {{ inventory_hostname }} still exists as a Longhorn Node CR
+          and will still appear in the Longhorn UI.
+
+
+    #################################################################
+    # REMOVE LOCAL CONTROL-PLANE STATE
+    #
+    # Preserve RKE2 installation/runtime so this machine can later
+    # become an agent or be promoted back to server.
+    #################################################################
+
+    - name: Remove RKE2 server state
+      ansible.builtin.file:
+        path: /var/lib/rancher/rke2/server
+        state: absent
+
+
+    #################################################################
+    # READ CLUSTER TOKEN
+    #################################################################
+
+    - name: Read cluster token from surviving control plane
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/rke2/server/node-token
+      delegate_to: "{{ control_node_ip }}"
+      register: cluster_token
+      no_log: true
+
+
+    - name: Set RKE2 token
+      ansible.builtin.set_fact:
+        rke2_token: "{{ cluster_token.content | b64decode | trim }}"
+      no_log: true
+
+
+    #################################################################
+    # UPDATE CONFIG.YAML ON SURVIVING CONTROL PLANES
+    #################################################################
+
+    # - name: Update RKE2 config on surviving control planes
+    #   ansible.builtin.copy:
+    #     dest: /etc/rancher/rke2/config.yaml
+    #     owner: root
+    #     group: root
+    #     mode: "0600"
+    #     content: |
+    #       server: "https://{{ kube_vip_address }}:9345"
+    #       token: "{{ rke2_token }}"
+
+    #       node-ip: "{{ hostvars[control_host].external_address.ip }}"
+
+    #       tls-san:
+    #         - "{{ kube_vip_address }}"
+    #       {% for node in surviving_control_nodes %}
+    #         - "{{ hostvars[node].external_address.ip }}"
+    #       {% endfor %}
+
+    #       cluster-dns: 10.43.0.10
+
+    #       disable:
+    #         - rke2-traefik
+
+    #       ingress-controller: none
+
+    #       kube-apiserver-arg:
+    #         - "default-not-ready-toleration-seconds=0"
+    #         - "default-unreachable-toleration-seconds=0"
+
+    #       kube-controller-manager-arg:
+    #         - "node-monitor-grace-period=50s"
+    #         - "node-monitor-period=2s"
+    #         - "node-eviction-rate=1"
+    #   delegate_to: "{{ hostvars[control_host].external_address.ip }}"
+    #   loop: "{{ surviving_control_nodes }}"
+    #   loop_control:
+    #     loop_var: control_host
+    #   no_log: true
+
+
+    #################################################################
+    # FINAL ETCD MEMBERSHIP
+    #################################################################
+
+    - name: Get final etcd member list
+      ansible.builtin.command:
+        argv:
+          - "{{ etcdctl_bin }}"
+          - --endpoints={{ etcd_endpoint }}
+          - --cacert={{ etcd_cacert }}
+          - --cert={{ etcd_cert }}
+          - --key={{ etcd_key }}
+          - member
+          - list
+          - --write-out=table
+      delegate_to: "{{ control_node_ip }}"
+      register: final_etcd_members
+      changed_when: false
+
+
+    #################################################################
+    # FINAL KUBERNETES VERIFICATION
+    #################################################################
+
+    - name: Final Kubernetes node check
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - get
+          - node
+          - "{{ inventory_hostname }}"
+      delegate_to: "{{ control_node_ip }}"
+      register: final_kubernetes_check
+      failed_when: false
+      changed_when: false
+
+
+    - name: Verify target remains absent from Kubernetes
+      ansible.builtin.assert:
+        that:
+          - final_kubernetes_check.rc != 0
+        fail_msg: >-
+          {{ inventory_hostname }} unexpectedly exists in Kubernetes.
+
+
+    #################################################################
+    # FINAL LONGHORN VERIFICATION
+    #################################################################
+
+    - name: Final Longhorn node check
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_bin }}"
+          - --kubeconfig
+          - "{{ kubeconfig }}"
+          - -n
+          - longhorn-system
+          - get
+          - nodes.longhorn.io
+          - "{{ inventory_hostname }}"
+      delegate_to: "{{ control_node_ip }}"
+      register: final_longhorn_check
+      failed_when: false
+      changed_when: false
+
+
+    - name: Verify target remains absent from Longhorn
+      ansible.builtin.assert:
+        that:
+          - final_longhorn_check.rc != 0
+        fail_msg: >-
+          {{ inventory_hostname }} unexpectedly exists in Longhorn.
+
+
+    #################################################################
+    # FINAL STATUS
+    #################################################################
+
+    - name: Display removal status
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "CONTROL-PLANE REMOVAL COMPLETE"
+          - "=============================================="
+          - "Node: {{ inventory_hostname }}"
+          - ""
+          - "etcd membership: REMOVED"
+          - "rke2-server: STOPPED + DISABLED"
+          - "Longhorn replicas on node: REMOVED"
+          - "Kubernetes Node: REMOVED"
+          - "Longhorn Node CR: REMOVED"
+          - "RKE2 server state: REMOVED"
+          - "RKE2 installation/runtime: PRESERVED"
+          - ""
+          - "Surviving control planes:"
+          - "{{ surviving_control_nodes }}"
+          - ""
+          - "Final etcd membership:"
+          - "{{ final_etcd_members.stdout_lines }}"
+          - "=============================================="

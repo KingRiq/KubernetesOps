@@ -1,0 +1,284 @@
+---
+- import_playbook: evaluate_ip.yml
+
+
+- name: Remove RKE2 worker from cluster
+  hosts: ClusterGroup
+  become: true
+  serial: 1
+
+  pre_tasks:
+
+    #################################################################
+    # SAFETY
+    #################################################################
+
+    - name: Require Ansible limit
+      ansible.builtin.assert:
+        that:
+          - ansible_limit is defined
+          - ansible_limit | length > 0
+        fail_msg: >-
+          You must specify the worker to remove with -l.
+          Example:
+          ansible-playbook -i inventory/Galaxia.yml
+          remove_worker.yml -l worker1
+
+    - name: Ensure control group exists
+      ansible.builtin.assert:
+        that:
+          - groups['control'] is defined
+          - groups['control'] | length > 0
+        fail_msg: >-
+          No hosts exist in the control inventory group.
+
+    - name: Prevent removal of control-plane nodes
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname not in groups['control']
+        fail_msg: >-
+          {{ inventory_hostname }} is currently in the control group.
+          Use the control-plane demotion/removal playbook instead.
+
+
+    #################################################################
+    # SELECT CONTROL PLANE
+    #################################################################
+
+    - name: Select control-plane node
+      ansible.builtin.set_fact:
+        control_node: "{{ groups['control'] | first }}"
+
+    - name: Set control-plane external IP
+      ansible.builtin.set_fact:
+        control_node_ip: >-
+          {{ hostvars[control_node].external_address.ip }}
+
+    - name: Verify control-plane external IP
+      ansible.builtin.assert:
+        that:
+          - control_node_ip is defined
+          - control_node_ip | length > 0
+        fail_msg: >-
+          No external_address.ip is defined for {{ control_node }}.
+
+    - name: Display selected control plane
+      ansible.builtin.debug:
+        msg:
+          - "Worker being removed: {{ inventory_hostname }}"
+          - "Control plane: {{ control_node }}"
+          - "Control plane external IP: {{ control_node_ip }}"
+
+
+    #################################################################
+    # VERIFY SELECTED CONTROL PLANE
+    #################################################################
+
+    - name: Verify Kubernetes API from selected control plane
+      ansible.builtin.command:
+        argv:
+          - /var/lib/rancher/rke2/bin/kubectl
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - get
+          - --raw=/readyz
+      delegate_to: "{{ control_node_ip }}"
+      register: control_ready
+      changed_when: false
+
+    - name: Verify control plane is ready
+      ansible.builtin.assert:
+        that:
+          - control_ready.rc == 0
+          - control_ready.stdout | trim == 'ok'
+        fail_msg: >-
+          {{ control_node }} at {{ control_node_ip }}
+          is not a working Kubernetes control plane.
+
+
+  tasks:
+
+    #################################################################
+    # CONTROL PLANE
+    #
+    # Drain worker.
+    #################################################################
+
+    - name: Drain worker
+      ansible.builtin.command:
+        argv:
+          - /var/lib/rancher/rke2/bin/kubectl
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - drain
+          - "{{ inventory_hostname }}"
+          - --ignore-daemonsets
+          - --delete-emptydir-data
+          - --force
+          - --timeout=300s
+      delegate_to: "{{ control_node_ip }}"
+      register: drain_result
+      changed_when: true
+    
+      #################################################################
+    # LONGHORN
+    #
+    # Disable scheduling on the Longhorn node first.
+    #################################################################
+
+    - name: Check whether worker exists in Longhorn
+      ansible.builtin.command:
+        argv:
+          - /var/lib/rancher/rke2/bin/kubectl
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - -n
+          - longhorn-system
+          - get
+          - nodes.longhorn.io
+          - "{{ inventory_hostname }}"
+      delegate_to: "{{ control_node_ip }}"
+      register: longhorn_node
+      failed_when: false
+      changed_when: false
+
+    - name: Disable Longhorn scheduling on worker
+      ansible.builtin.command:
+        argv:
+          - /var/lib/rancher/rke2/bin/kubectl
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - -n
+          - longhorn-system
+          - patch
+          - nodes.longhorn.io
+          - "{{ inventory_hostname }}"
+          - --type=merge
+          - -p
+          - '{"spec":{"allowScheduling":false}}'
+      delegate_to: "{{ control_node_ip }}"
+      when: longhorn_node.rc == 0
+      changed_when: true
+
+    - name: Display drain result
+      ansible.builtin.debug:
+        var: drain_result.stdout_lines
+
+
+    #################################################################
+    # WORKER
+    #
+    # Stop and disable RKE2 agent.
+    #################################################################
+
+    - name: Stop RKE2 agent
+      ansible.builtin.systemd:
+        name: rke2-agent
+        state: stopped
+
+    - name: Disable RKE2 agent
+      ansible.builtin.systemd:
+        name: rke2-agent
+        enabled: false
+
+
+    #################################################################
+    # WORKER
+    #
+    # Kill remaining RKE2 processes.
+    #################################################################
+
+    - name: Check for RKE2 killall script
+      ansible.builtin.stat:
+        path: /usr/local/bin/rke2-killall.sh
+      register: rke2_killall
+
+    - name: Kill remaining RKE2 processes
+      ansible.builtin.command:
+        cmd: /usr/local/bin/rke2-killall.sh
+      when: rke2_killall.stat.exists
+      changed_when: true
+
+
+    #################################################################
+    # CONTROL PLANE
+    #
+    # Delete Kubernetes node.
+    #################################################################
+
+    - name: Delete worker from Kubernetes
+      ansible.builtin.command:
+        argv:
+          - /var/lib/rancher/rke2/bin/kubectl
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - delete
+          - node
+          - "{{ inventory_hostname }}"
+          - --ignore-not-found=true
+      delegate_to: "{{ control_node_ip }}"
+      register: delete_node
+      changed_when: true
+
+    - name: Display Kubernetes deletion result
+      ansible.builtin.debug:
+        var: delete_node.stdout_lines
+
+
+    #################################################################
+    # WORKER
+    #
+    # Remove local agent state.
+    #
+    # RKE2 itself remains installed.
+    #################################################################
+
+    - name: Remove RKE2 agent state
+      ansible.builtin.file:
+        path: /var/lib/rancher/rke2/agent
+        state: absent
+
+
+    #################################################################
+    # CONTROL PLANE
+    #
+    # Verify node is gone.
+    #################################################################
+
+    - name: Check whether worker still exists
+      ansible.builtin.command:
+        argv:
+          - /var/lib/rancher/rke2/bin/kubectl
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - get
+          - node
+          - "{{ inventory_hostname }}"
+      delegate_to: "{{ control_node_ip }}"
+      register: node_check
+      failed_when: false
+      changed_when: false
+
+    - name: Verify worker was removed
+      ansible.builtin.assert:
+        that:
+          - node_check.rc != 0
+        fail_msg: >-
+          {{ inventory_hostname }} still exists in Kubernetes.
+
+
+    #################################################################
+    # FINAL STATUS
+    #################################################################
+
+    - name: Display removal status
+      ansible.builtin.debug:
+        msg:
+          - "Worker: {{ inventory_hostname }}"
+          - "Kubernetes node: REMOVED"
+          - "RKE2 agent: STOPPED"
+          - "RKE2 agent service: DISABLED"
+          - "Local RKE2 agent state: REMOVED"
+          - "RKE2 installation: PRESERVED"
+          - "Control plane used: {{ control_node }}"
+          - "Control plane IP: {{ control_node_ip }}"

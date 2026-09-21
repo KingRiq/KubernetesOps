@@ -21,9 +21,7 @@
   vars:
     firewall_ports: "{{ rke_ports }}"
 
-- name: 
-
-
+- name:  do stuff (rename this to what its actuallly doing)
   ansible.posix.firewalld:
     zone: trusted
     interface: "{{ item }}"

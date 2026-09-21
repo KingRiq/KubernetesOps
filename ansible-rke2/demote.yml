@@ -1,0 +1,202 @@
+---
+- import_playbook: evaluate_ip.yml
+
+- name: Demote RKE2 control plane to worker
+  hosts: ClusterGroup
+  become: true
+  serial: 1
+
+  pre_tasks:
+    - name: Require Ansible limit
+      ansible.builtin.assert:
+        that:
+          - ansible_limit is defined
+          - ansible_limit | length > 0
+        fail_msg: >-
+          You must specify the node to demote with -l.
+          Example:
+          ansible-playbook -i inventory/Galaxia.yml
+          demote_control_plane.yml -l worker1
+      run_once: true
+
+
+  tasks:
+    #
+    # Get cluster token BEFORE stopping this server
+    #
+
+    - name: Read cluster token from existing control plane
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/rke2/server/node-token
+      register: cluster_token
+      delegate_to: "{{ hostvars[groups['control'][0]].external_address.ip }}"
+      run_once: true
+
+    - name: Set RKE2 token
+      ansible.builtin.set_fact:
+        rke2_token: "{{ cluster_token.content | b64decode | trim }}"
+
+    #
+    # Drain node
+    #
+
+    - name: Drain node before demotion
+      ansible.builtin.command:
+        cmd: >-
+          /var/lib/rancher/rke2/bin/kubectl
+          --kubeconfig /etc/rancher/rke2/rke2.yaml
+          drain {{ inventory_hostname }}
+          --ignore-daemonsets
+          --delete-emptydir-data
+          --force
+          --timeout=300s
+      register: drain_result
+      changed_when: true
+
+    #
+    # Stop server
+    #
+
+    - name: Stop RKE2 server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: stopped
+        enabled: false
+
+    #
+    # IMPORTANT:
+    # rke2-server can leave containerd shims/static pods running.
+    #
+
+    - name: Kill remaining RKE2 processes
+      ansible.builtin.command:
+        cmd: /usr/local/bin/rke2-killall.sh
+      changed_when: true
+
+    #
+    # Remove this server/etcd member from the cluster
+    #
+    # Run kubectl from another control-plane node.
+    #
+
+    - name: Delete old control-plane node from Kubernetes
+      ansible.builtin.command:
+        cmd: >-
+          /var/lib/rancher/rke2/bin/kubectl
+          --kubeconfig /etc/rancher/rke2/rke2.yaml
+          delete node {{ inventory_hostname }}
+          --ignore-not-found=true
+      delegate_to: >-
+        {{
+          groups['control']
+          | reject('equalto', inventory_hostname)
+          | first
+        }}
+      changed_when: true
+
+    #
+    # Remove SERVER-SPECIFIC state.
+    #
+    # Keep the rest of /var/lib/rancher/rke2.
+    #
+
+    - name: Remove old RKE2 server state
+      ansible.builtin.file:
+        path: /var/lib/rancher/rke2/server
+        state: absent
+
+    #
+    # Configure as worker/agent
+    #
+
+    - name: Ensure RKE2 configuration directory exists
+      ansible.builtin.file:
+        path: /etc/rancher/rke2
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Configure RKE2 agent
+      ansible.builtin.copy:
+        dest: /etc/rancher/rke2/config.yaml
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          server: "https://{{ kube_vip_address }}:9345"
+          token: "{{ rke2_token }}"
+
+          node-ip: "{{ hostvars[inventory_hostname].external_address.ip }}"
+      no_log: true
+
+    #
+    # Start agent
+    #
+
+    - name: Enable RKE2 agent
+      ansible.builtin.systemd:
+        name: rke2-agent
+        enabled: true
+        daemon_reload: true
+
+    - name: Start RKE2 agent
+      ansible.builtin.systemd:
+        name: rke2-agent
+        state: started
+
+    #
+    # Verify
+    #
+
+    - name: Wait for node to re-register
+      ansible.builtin.command:
+        cmd: >-
+          /var/lib/rancher/rke2/bin/kubectl
+          --kubeconfig /etc/rancher/rke2/rke2.yaml
+          wait
+          --for=condition=Ready
+          node/{{ inventory_hostname }}
+          --timeout=300s
+      delegate_to: >-
+        {{
+          groups['control']
+          | reject('equalto', inventory_hostname)
+          | first
+        }}
+      register: node_ready
+      changed_when: false
+
+    - name: Uncordon demoted node
+      ansible.builtin.command:
+        cmd: >-
+          /var/lib/rancher/rke2/bin/kubectl
+          --kubeconfig /etc/rancher/rke2/rke2.yaml
+          uncordon {{ inventory_hostname }}
+      delegate_to: >-
+        {{
+          groups['control']
+          | reject('equalto', inventory_hostname)
+          | first
+        }}
+      changed_when: true
+
+    - name: Get demoted node status
+      ansible.builtin.command:
+        cmd: >-
+          /var/lib/rancher/rke2/bin/kubectl
+          --kubeconfig /etc/rancher/rke2/rke2.yaml
+          get node {{ inventory_hostname }}
+          -o wide
+      delegate_to: >-
+        {{
+          groups['control']
+          | reject('equalto', inventory_hostname)
+          | first
+        }}
+      register: demoted_node
+      changed_when: false
+
+    - name: Display demoted node
+      ansible.builtin.debug:
+        var: demoted_node.stdout_lines

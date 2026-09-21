@@ -7,9 +7,12 @@
     content: |
       cluster-init: true
       cluster-dns: 10.43.0.10
-      node-ip: "{{ hostvars[groups['control'][0]].external_address.ip }}"
+      node-ip: "{{ hostvars[inventory_hostname].external_address.ip }}"
       tls-san:
+        - "{{ kube_vip_address }}"
         - "{{ hostvars[groups['control'][0]].external_address.ip }}"
+        - "{{ hostvars[groups['control'][1]].external_address.ip }}"
+        - "{{ hostvars[groups['control'][2]].external_address.ip }}"
       disable:
         - rke2-traefik
       ingress-controller: none
@@ -20,9 +23,6 @@
         - "node-monitor-grace-period=50s"
         - "node-monitor-period=2s"
         - "node-eviction-rate=1"
-        - "volume-host-fault-timeout=15s" 
-
-      
   when: inventory_hostname == groups['control'][0]
 
 
@@ -81,27 +81,68 @@
     rke2_token: "{{ rke2_token_file.content | b64decode | trim }}"
   when: inventory_hostname == groups['control'][0]
 
+- name: Ensure RKE2 manifest directory exists
+  become: true
+  ansible.builtin.file:
+    path: /var/lib/rancher/rke2/server/manifests
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - inventory_hostname == groups['control']
+
+
+- name: Deploy kube-vip manifest
+  become: true
+  ansible.builtin.template:
+    src: templates/kube-vip.yaml.j2
+    dest: /var/lib/rancher/rke2/server/manifests/kube-vip.yaml
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - inventory_hostname == groups['control']
+
+
+- name: Wait for kube-vip API address
+  ansible.builtin.wait_for:
+    host: "{{ kube_vip_address }}"
+    port: 6443
+    timeout: 180
+  when:
+    - inventory_hostname == groups['control'][0]
+
+
+- name: Wait for kube-vip RKE2 supervisor address
+  ansible.builtin.wait_for:
+    host: "{{ kube_vip_address }}"
+    port: 9345
+    timeout: 180
+  when:
+    - inventory_hostname == groups['control'][0]
 
 - name: Share token and server URL with all nodes
   set_fact:
     rke2_token: "{{ hostvars[groups['control'][0]].rke2_token }}"
-    rke2_server_url: "https://{{ hostvars[groups['control'][0]].external_address.ip }}:9345"
   when: hostvars[groups['control'][0]].rke2_token is defined
 
 - name: Debug token on manager
   debug:
     var: rke2_token
 
-- name: Debug token on manager
-  debug:
-    var: rke2_server_url
-
 - name: Configure RKE2 server config on additional managers (join bootstrap)
   copy:
     dest: /etc/rancher/rke2/config.yaml
     content: |
-      server: "https://{{ hostvars[groups['control'][0]].external_address.ip }}:9345"
+      server: "https://{{ kube_vip_address }}:9345"
       token: "{{ rke2_token }}"
+      node-ip: "{{ hostvars[inventory_hostname].external_address.ip }}"
+      tls-san:
+        - "{{ kube_vip_address }}"
+        - "{{ hostvars[groups['control'][0]].external_address.ip }}"
+        - "{{ hostvars[groups['control'][1]].external_address.ip }}"
+        - "{{ hostvars[groups['control'][2]].external_address.ip }}"
       cluster-dns: 10.43.0.10
       disable:
         - rke2-traefik
@@ -113,7 +154,6 @@
         - "node-monitor-grace-period=50s"
         - "node-monitor-period=2s"
         - "node-eviction-rate=1"
-        - "volume-host-fault-timeout=15s"
     mode: '0755'
   when:
     - inventory_hostname in groups['control']
@@ -153,8 +193,9 @@
   copy:
     dest: /etc/rancher/rke2/config.yaml
     content: |
-      server: "{{ rke2_server_url }}"
+      server: "https://{{ kube_vip_address }}:9345"
       token: "{{ rke2_token }}"
+      node-ip: "{{ hostvars[inventory_hostname].external_address.ip }}"
     mode: '0755'
   when: inventory_hostname in groups['workers']
 

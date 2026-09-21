@@ -1,0 +1,14 @@
+---
+- import_playbook: evaluate_ip.yml
+
+- name: Reboot every host safely
+  hosts: ClusterGroup
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Reboot host
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+        connect_timeout: 10
+        post_reboot_delay: 10

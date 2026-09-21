@@ -1,6 +1,5 @@
 all:
   hosts:
-
     manager:
       ansible_host: 10.22.6.110
       ansible_user: rocky9
@@ -59,40 +58,29 @@ all:
         ip: 192.168.0.102
         gateway: 192.168.0.1
         dns: 192.168.0.1
+    # worker3:
+    #   ansible_host: 10.22.6.114
+    #   ansible_user: rocky9
+    #   internal_address:
+    #     ip: 10.22.6.112
+    #     gateway: 10.22.6.1
+    #     dns: 10.22.6.1
+    #   external_address:
+    #     ip: 192.168.0.112
+    #     gateway: 192.168.0.1
+    #     dns: 192.168.0.1
+    # worker4:
+    #   ansible_host: 10.22.6.115
+    #   ansible_user: rocky9
+    #   internal_address:
+    #     ip: 10.22.6.104
+    #     gateway: 10.22.6.1
+    #     dns: 10.22.6.1
+    #   external_address:
+    #     ip: 192.168.0.104
+    #     gateway: 192.168.0.1
+    #     dns: 192.168.0.1
     worker3:
-      ansible_host: 10.22.6.114
-      ansible_user: rocky9
-      internal_address:
-        ip: 10.22.6.112
-        gateway: 10.22.6.1
-        dns: 10.22.6.1
-      external_address:
-        ip: 192.168.0.112
-        gateway: 192.168.0.1
-        dns: 192.168.0.1
-    worker4:
-      ansible_host: 10.22.6.115
-      ansible_user: rocky9
-      internal_address:
-        ip: 10.22.6.104
-        gateway: 10.22.6.1
-        dns: 10.22.6.1
-      external_address:
-        ip: 192.168.0.104
-        gateway: 192.168.0.1
-        dns: 192.168.0.1
-    worker5:
-      ansible_host: 10.22.6.116
-      ansible_user: rocky9
-      internal_address:
-        ip: 10.22.6.105
-        gateway: 10.22.6.1
-        dns: 10.22.6.1
-      external_address:
-        ip: 192.168.0.105
-        gateway: 192.168.0.1
-        dns: 192.168.0.1
-    worker6:
       ansible_host: 192.168.0.176
       ansible_user: rocky9
       internal_address:
@@ -103,7 +91,7 @@ all:
         ip: 192.168.0.106
         gateway: 192.168.0.1
         dns: 192.168.0.1
-    worker7:
+    worker4:
       ansible_host: 192.168.0.50
       ansible_user: rocky9
       internal_address:
@@ -114,17 +102,17 @@ all:
         ip: 192.168.0.107
         gateway: 192.168.0.1
         dns: 192.168.0.1
-    worker8:
-      ansible_host: 192.168.0.154
-      ansible_user: rocky9
-      internal_address:
-        ip: 10.22.6.108
-        gateway: 10.22.6.1
-        dns: 10.22.6.1
-      external_address:
-        ip: 192.168.0.108
-        gateway: 192.168.0.1
-        dns: 192.168.0.1
+    # worker8:
+    #   ansible_host: 192.168.0.154
+    #   ansible_user: rocky9
+    #   internal_address:
+    #     ip: 10.22.6.108
+    #     gateway: 10.22.6.1
+    #     dns: 10.22.6.1
+    #   external_address:
+    #     ip: 192.168.0.108
+    #     gateway: 192.168.0.1
+    #     dns: 192.168.0.1
     # worker9:
     #   ansible_host: 192.168.0.240
     #   ansible_user: rocky9
@@ -159,11 +147,12 @@ all:
     #     gateway: 192.168.0.1
     #     dns: 192.168.0.1
   vars:
-    netmask: 24
+    netmask: 16
     storage_node: lunap
     storage_node_ip: 192.168.0.98
     samba_assigned_ip: 192.168.0.235
     nfs_assigned_ip: 192.168.0.236
+    kube_vip_address: 192.168.1.250
 
 ClusterGroup:
   children:
@@ -178,7 +167,7 @@ control:
 
 workers:
   hosts:
-    worker[1:8]:
+    worker[1:4]:
 
 storage:
   hosts:

@@ -1,0 +1,137 @@
+---
+- import_playbook: evaluate_ip.yml
+
+- name: Promote RKE2 worker to control plane
+  hosts: ClusterGroup
+  become: true
+
+  vars:
+    rke2_server_url: "https://{{ kube_vip_address }}:9345"
+
+  tasks:
+    # - name: Verify promotion target is not already running rke2-server
+    #   ansible.builtin.command:
+    #     cmd: systemctl is-active rke2-server
+    #   register: rke2_server_status
+    #   changed_when: false
+    #   failed_when: false
+
+    # - name: Stop if node is already a control plane
+    #   ansible.builtin.fail:
+    #     msg: "{{ inventory_hostname }} is already running rke2-server."
+    #   when: rke2_server_status.stdout == "active"
+
+    - name: Read cluster token from existing control plane
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/rke2/server/node-token
+      register: cluster_token
+      delegate_to: "{{ hostvars[groups['control'][0]].external_address.ip }}"
+      run_once: true
+
+    - name: Set RKE2 token
+      ansible.builtin.set_fact:
+        rke2_token: "{{ cluster_token.content | b64decode | trim }}"
+
+    - name: Stop RKE2 agent
+      ansible.builtin.systemd:
+        name: rke2-agent
+        state: stopped
+        enabled: false
+      ignore_errors: true
+
+    - name: Remove old agent config
+      ansible.builtin.file:
+        path: /etc/rancher/rke2/config.yaml
+        state: absent
+
+    - name: Run uninstall script (if exists)
+      command: /usr/bin/rke2-uninstall.sh
+      register: uninstall_result
+      failed_when: false
+
+    - name: Create RKE2 config directory
+      ansible.builtin.file:
+        path: /etc/rancher/rke2
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Configure node as RKE2 server
+      ansible.builtin.copy:
+        dest: /etc/rancher/rke2/config.yaml
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          server: "https://{{ kube_vip_address }}:9345"
+          token: "{{ rke2_token }}"
+          node-ip: "{{ hostvars[inventory_hostname].external_address.ip }}"
+          tls-san:
+            - "{{ kube_vip_address }}"
+            - "{{ hostvars[groups['control'][0]].external_address.ip }}"
+            - "{{ hostvars[groups['control'][1]].external_address.ip }}"
+            - "{{ hostvars[groups['control'][2]].external_address.ip }}"
+          cluster-dns: 10.43.0.10
+          disable:
+            - rke2-traefik
+          ingress-controller: none
+          kube-apiserver-arg:
+            - "default-not-ready-toleration-seconds=0"
+            - "default-unreachable-toleration-seconds=0"
+          kube-controller-manager-arg:
+            - "node-monitor-grace-period=50s"
+            - "node-monitor-period=2s"
+            - "node-eviction-rate=1"
+
+    - name: Download and install RKE2
+      shell: |
+        curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE={{ 'server' }} sh -
+      args:
+        creates: /usr/local/bin/rke2
+
+    - name: Enable RKE2 server
+      ansible.builtin.systemd:
+        name: rke2-server
+        enabled: true
+        daemon_reload: true
+
+    - name: Start RKE2 server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: started
+
+    - name: Wait for RKE2 supervisor
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[inventory_hostname].external_address.ip }}"
+        port: 9345
+        timeout: 180
+
+    - name: Wait for Kubernetes API
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[inventory_hostname].external_address.ip }}"
+        port: 6443
+        timeout: 180
+
+    - name: Wait for node to become Ready
+      ansible.builtin.command:
+        cmd: >
+          /var/lib/rancher/rke2/bin/kubectl
+          --kubeconfig /etc/rancher/rke2/rke2.yaml
+          wait node/{{ inventory_hostname }}
+          --for=condition=Ready
+          --timeout=180s
+      changed_when: false
+
+    - name: Show promoted node
+      ansible.builtin.command:
+        cmd: >
+          /var/lib/rancher/rke2/bin/kubectl
+          --kubeconfig /etc/rancher/rke2/rke2.yaml
+          get node {{ inventory_hostname }} -o wide
+      register: promoted_node
+      changed_when: false
+
+    - name: Display promoted node
+      ansible.builtin.debug:
+        var: promoted_node.stdout_lines

@@ -94,8 +94,7 @@
         name: default-address-pool
         namespace: "{{ metallb_namespace }}"
       spec:
-        addresses:
-          - "{{ metallb_ip_range }}"
+        addresses: "{{ metallb_ip_range }}"
 
 - name: Manage MetalLB advertisement
   kubernetes.core.k8s:
