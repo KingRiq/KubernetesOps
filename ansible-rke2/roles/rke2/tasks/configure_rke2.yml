@@ -6,19 +6,23 @@
     mode: "0755"
     content: |
       cluster-init: true
-      cluster-dns: 10.43.0.10
       node-ip: "{{ hostvars[inventory_hostname].external_address.ip }}"
       tls-san:
         - "{{ kube_vip_address }}"
         - "{{ hostvars[groups['control'][0]].external_address.ip }}"
         - "{{ hostvars[groups['control'][1]].external_address.ip }}"
         - "{{ hostvars[groups['control'][2]].external_address.ip }}"
+      cluster-cidr: "10.42.0.0/16"
+      service-cidr: "10.43.0.0/16"
+      cluster-dns: "10.43.0.10"
+      cluster-domain: "cluster.local"
+      cni: canal
       disable:
         - rke2-traefik
       ingress-controller: none
       kube-apiserver-arg:
-        - "default-not-ready-toleration-seconds=0"
-        - "default-unreachable-toleration-seconds=0"
+        - "default-not-ready-toleration-seconds=10"
+        - "default-unreachable-toleration-seconds=10
       kube-controller-manager-arg:
         - "node-monitor-grace-period=50s"
         - "node-monitor-period=2s"
@@ -143,13 +147,17 @@
         - "{{ hostvars[groups['control'][0]].external_address.ip }}"
         - "{{ hostvars[groups['control'][1]].external_address.ip }}"
         - "{{ hostvars[groups['control'][2]].external_address.ip }}"
-      cluster-dns: 10.43.0.10
+      cluster-cidr: "10.42.0.0/16"
+      service-cidr: "10.43.0.0/16"
+      cluster-dns: "10.43.0.10"
+      cluster-domain: "cluster.local"
+      cni: canal
       disable:
         - rke2-traefik
       ingress-controller: none
       kube-apiserver-arg:
-        - "default-not-ready-toleration-seconds=0"
-        - "default-unreachable-toleration-seconds=0"
+        - "default-not-ready-toleration-seconds=10"
+        - "default-unreachable-toleration-seconds=10"
       kube-controller-manager-arg:
         - "node-monitor-grace-period=50s"
         - "node-monitor-period=2s"
