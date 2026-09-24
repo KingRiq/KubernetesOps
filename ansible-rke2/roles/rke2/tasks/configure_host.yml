@@ -1,0 +1,78 @@
+- name: Set hostname on all nodes
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Deploy /etc/hosts from template
+  template:
+    src: templates/hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy bashrc from template
+  template:
+    src: templates/bashrc.j2
+    dest: "~/.bashrc"
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install passwordless sudoers file
+  become: true
+  template:
+    src: templates/nopassword-sudo.j2
+    dest: /etc/sudoers.d/99-nopasswd-sudo
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Add RKE2 bin directory to root's .bashrc
+  lineinfile:
+    path: /root/.bashrc
+    regexp: '^export PATH='
+    line: 'export PATH=$PATH:/var/lib/rancher/rke2/bin'
+    create: yes
+
+- name: Add KUBECONFIG to root's .bashrc
+  lineinfile:
+    path: /root/.bashrc
+    regexp: '^export KUBECONFIG='
+    line: 'export KUBECONFIG=/etc/rancher/rke2/rke2.yaml'
+    create: yes
+
+- name: Restart NetworkManager
+  service:
+    name: NetworkManager
+    state: restarted
+
+- include_role: 
+    name: firewall
+  vars:
+    firewall_ports: "{{ rke_ports }}"
+
+- name:  do stuff (rename this to what its actuallly doing)
+  ansible.posix.firewalld:
+    zone: trusted
+    interface: "{{ item }}"
+    permanent: true
+    state: enabled
+  loop:
+    - cni0
+    - flannel.1
+    - kube-ipvs0
+  ignore_errors: true
+
+- name: Trust Pod/Service CIDRs
+  ansible.posix.firewalld:
+    zone: trusted
+    source: "{{ item }}"
+    permanent: true
+    state: enabled
+  loop:
+    - 10.42.0.0/16   # Pods 
+    - 10.43.0.0/16   # Services 
+
+- name: Reload firewalld
+  ansible.builtin.command: firewall-cmd --reload

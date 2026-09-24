@@ -24,7 +24,6 @@
 - import_playbook: install_helm.yml
   when: state == 'present'
   tags:
-    - rke2
     - helm
 
 - name: "{{ state }}ing RKE2 nodes "

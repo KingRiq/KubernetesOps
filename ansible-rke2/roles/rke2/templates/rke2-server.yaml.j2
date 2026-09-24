@@ -1,0 +1,40 @@
+{% if inventory_hostname == groups['control'][0] %}
+cluster-init: true
+{% else %}
+server: "https://{{ kube_vip_address }}:9345"
+token: {{ rke2_token }}
+{% endif %}
+
+node-ip: "{{ hostvars[inventory_hostname].external_address.ip }}"
+
+tls-san:
+  - "{{ kube_vip_address }}"
+{% for host in groups['control'] %}
+  - "{{ hostvars[host].external_address.ip }}"
+{% endfor %}
+
+cluster-cidr: "10.42.0.0/16"
+service-cidr: "10.43.0.0/16"
+cluster-dns: "10.43.0.10"
+cluster-domain: "cluster.local"
+
+cni: canal
+
+disable:
+  - rke2-traefik
+
+ingress-controller: none
+
+kube-apiserver-arg:
+  - "default-not-ready-toleration-seconds=10"
+  - "default-unreachable-toleration-seconds=10"
+
+kube-controller-manager-arg:
+  - "node-monitor-grace-period=50s"
+  - "node-monitor-period=2s"
+  - "node-eviction-rate=1"
+
+kubelet-arg:
+  - "system-reserved=cpu=500m,memory=1Gi"
+  - "kube-reserved=cpu=500m,memory=1Gi"
+  - "eviction-hard=memory.available<500Mi,nodefs.available<10%"
