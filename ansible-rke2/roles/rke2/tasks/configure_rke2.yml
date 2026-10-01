@@ -26,7 +26,7 @@
     owner: root
     group: root
     mode: "0755"
-  when: inventory_hostname == groups['control'][0]
+  when: inventory_hostname in groups['control']
 
 - name: Deploy kube-vip manifest
   become: true
@@ -36,7 +36,7 @@
     owner: root
     group: root
     mode: "0644"
-  when: inventory_hostname in groups['control'][0]
+  when: inventory_hostname in groups['control']
 
 - name: Enable the rke2-server
   systemd:

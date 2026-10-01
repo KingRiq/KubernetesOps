@@ -1,6 +1,6 @@
 ---
 - import_playbook: evaluate_ip.yml
-
+  tags: active
 
 - name: Permanently remove RKE2 control-plane node
   hosts: ClusterGroup
@@ -52,7 +52,7 @@
             | default([])
             | difference([inventory_hostname])
           }}
-
+      tags: always
 
     - name: Verify a surviving control plane exists
       ansible.builtin.assert:
@@ -61,16 +61,19 @@
         fail_msg: >-
           No surviving control-plane node is available to perform
           cluster-side removal operations.
+      tags: always
 
 
     - name: Select surviving control plane
       ansible.builtin.set_fact:
         control_node: "{{ surviving_control_nodes | first }}"
+      tags: always
 
 
     - name: Set surviving control-plane IP
       ansible.builtin.set_fact:
         control_node_ip: "{{ hostvars[control_node].external_address.ip }}"
+      tags: always
 
 
     - name: Display removal plan
@@ -85,6 +88,7 @@
           - "Control IP: {{ control_node_ip }}"
           - "Surviving controls: {{ surviving_control_nodes }}"
           - "=============================================="
+      tags: always
 
 
     #################################################################
@@ -102,7 +106,7 @@
       delegate_to: "{{ control_node_ip }}"
       register: control_ready
       changed_when: false
-
+      tags: always
 
     - name: Verify surviving control plane is healthy
       ansible.builtin.assert:
@@ -112,7 +116,7 @@
         fail_msg: >-
           {{ control_node }} at {{ control_node_ip }}
           is not a healthy Kubernetes control plane.
-
+      tags: always
 
     #################################################################
     # VERIFY ETCDCTL
@@ -123,7 +127,7 @@
         path: "{{ etcdctl_bin }}"
       delegate_to: "{{ control_node_ip }}"
       register: etcdctl_status
-
+      tags: always
 
     - name: Require etcdctl
       ansible.builtin.assert:
@@ -131,7 +135,7 @@
           - etcdctl_status.stat.exists
         fail_msg: >-
           {{ etcdctl_bin }} does not exist on {{ control_node }}.
-
+      tags: always
 
   tasks:
 
@@ -187,11 +191,13 @@
       delegate_to: "{{ control_node_ip }}"
       register: etcd_members_raw
       changed_when: false
+      tags: remove
 
 
     - name: Parse etcd member list
       ansible.builtin.set_fact:
         etcd_members: "{{ (etcd_members_raw.stdout | from_json).members }}"
+      tags: remove
 
 
     - name: Find target etcd member
@@ -206,6 +212,7 @@
               )
             | list
           }}
+      tags: remove
 
 
     #################################################################
@@ -223,7 +230,7 @@
         fail_msg: >-
           Found {{ target_etcd_members | length }} etcd members
           matching {{ inventory_hostname }}. Refusing to guess.
-
+      tags: remove
 
     - name: Report already removed etcd member
       ansible.builtin.debug:
@@ -231,7 +238,7 @@
           {{ inventory_hostname }} is already absent from etcd.
           Continuing cleanup.
       when: target_etcd_members | length == 0
-
+      tags: remove
 
     #################################################################
     # CONVERT ETCD MEMBER ID
@@ -246,7 +253,7 @@
           {{ '%x' | format(target_etcd_members[0].ID | int) }}
         target_etcd_member_name: "{{ target_etcd_members[0].name }}"
       when: target_etcd_members | length == 1
-
+      tags: remove
 
     - name: Display target etcd member
       ansible.builtin.debug:
@@ -255,7 +262,7 @@
           - "etcd member: {{ target_etcd_member_name }}"
           - "etcd member ID: {{ target_etcd_member_id }}"
       when: target_etcd_members | length == 1
-
+      tags: remove
 
     #################################################################
     # REMOVE ETCD MEMBERSHIP FIRST
@@ -276,13 +283,13 @@
       register: etcd_remove
       changed_when: true
       when: target_etcd_members | length == 1
-
+      tags: remove
 
     - name: Display etcd removal result
       ansible.builtin.debug:
         var: etcd_remove.stdout_lines
       when: target_etcd_members | length == 1
-
+      tags: remove
 
     #################################################################
     # VERIFY ETCD MEMBERSHIP IS GONE

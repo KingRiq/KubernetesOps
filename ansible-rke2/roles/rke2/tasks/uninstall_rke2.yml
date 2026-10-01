@@ -22,6 +22,7 @@
 - name: Kill Longhorn, kubelet, and containerd leftovers
   become: true
   ansible.builtin.shell: |
+    sudo systemctl stop rke2-server rke2-agent 2>/dev/null || true
     pkill -9 -f longhorn || true
     pkill -9 -f engine-manager || true
     pkill -9 -f instance-manager || true
@@ -31,6 +32,10 @@
     pkill -9 -f containerd-shim || true
     pkill -9 -f containerd || true
     pkill -9 -f rke2 || true
+    pkill -9 -f kube-vip || true
+    pkill -9 -f calico || true
+    pkill -9 -f flannel || true
+    pkill -9 -f kubelet || true
   args:
     executable: /bin/bash
   changed_when: true
@@ -43,19 +48,6 @@
 - name: Run uninstall script (if exists)
   command: /usr/bin/rke2-uninstall.sh
   register: uninstall_result
-  failed_when: false
-
-- name: Kill leftover RKE2/containerd/kubelet processes
-  become: true
-  ansible.builtin.shell: |
-    sudo systemctl stop rke2-server rke2-agent 2>/dev/null || true
-    pkill -9 -f rke2 || true
-    pkill -9 -f kubelet || true
-    pkill -9 -f containerd-shim || true
-    pkill -9 -f containerd || true
-  args:
-    executable: /bin/bash
-  changed_when: true
   failed_when: false
 
 - name: Lazy unmount kubelet mountpoints
@@ -94,3 +86,55 @@
   debug:
     msg: "Remaining open ports: {{ remaining_ports.stdout }}"
   when: remaining_ports.stdout | length > 0
+
+########################################################################
+# REMOVE RKE2 RUNTIME NETWORKING
+########################################################################
+
+- name: Remove leftover Calico interfaces
+  become: true
+  ansible.builtin.shell: |
+    set -o pipefail
+
+    for iface in $(ip -o link show |
+                   awk -F': ' '$2 ~ /^cali/ {print $2}' |
+                   cut -d@ -f1); do
+      echo "Deleting $iface"
+      ip link delete "$iface" || true
+    done
+  args:
+    executable: /bin/bash
+  register: calico_interfaces
+  changed_when: calico_interfaces.stdout | length > 0
+
+
+- name: Remove leftover RKE2 pod routes
+  become: true
+  ansible.builtin.shell: |
+    set -o pipefail
+
+    while ip -4 route show | grep -q '^10\.42\.'; do
+      route="$(ip -4 route show | grep '^10\.42\.' | head -1)"
+      echo "Deleting route: $route"
+      ip route del $route || break
+    done
+  args:
+    executable: /bin/bash
+  register: pod_routes
+  changed_when: pod_routes.stdout | length > 0
+
+
+- name: Remove kube-vip address if still present
+  become: true
+  ansible.builtin.shell: |
+    set -o pipefail
+
+    for iface in $(ip -o -4 addr show |
+                   awk '$4 == "{{ kube_vip_address }}/32" {print $2}'); do
+      echo "Deleting {{ kube_vip_address }}/32 from $iface"
+      ip addr del "{{ kube_vip_address }}/32" dev "$iface"
+    done
+  args:
+    executable: /bin/bash
+  register: kube_vip_address_cleanup
+  changed_when: kube_vip_address_cleanup.stdout | length > 0

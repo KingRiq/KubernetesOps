@@ -1,5 +1,20 @@
 - include_tasks: configure_host.yml
 
+- name: Check whether RKE2 is already installed
+  ansible.builtin.stat:
+    path: /usr/bin/rke2
+  register: rke2_installed
+
+- name: Remove broken RKE2 repository left by installer
+  ansible.builtin.file:
+    path: /etc/yum.repos.d/rancher-rke2.repo
+    state: absent
+
+- name: Clean DNF metadata
+  ansible.builtin.command:
+    cmd: dnf clean all
+  changed_when: false
+
 - name: Download and install RKE2
   shell: |
     curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE={{ 'server' if inventory_hostname in groups['control'] else 'agent' }} sh -

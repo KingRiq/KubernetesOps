@@ -25,10 +25,18 @@ all:
         dns: 192.168.0.1
 
     diana:
-      ansible_host: 192.168.0.178
-      ansible_user: diana
+      ansible_host: 192.168.0.29
+      ansible_user: rocky9
       external_address:
         ip: 192.168.0.99
+        gateway: 192.168.0.1
+        dns: 192.168.0.1
+    
+    d1:
+      ansible_host: 192.168.0.30
+      ansible_user: rocky9
+      external_address:
+        ip: 192.168.0.108
         gateway: 192.168.0.1
         dns: 192.168.0.1
 
@@ -107,7 +115,7 @@ all:
     storage_node_ip: 192.168.0.106
     samba_assigned_ip: 192.168.0.235
     nfs_assigned_ip: 192.168.0.236
-    kube_vip_address: 192.168.1.250
+    kube_vip_address: 192.168.0.237
 
 ClusterGroup:
   children:
@@ -124,6 +132,7 @@ workers:
   hosts:
     g[1:4]:
     l[1:2]:
+    d1:
 
 storage:
   hosts:

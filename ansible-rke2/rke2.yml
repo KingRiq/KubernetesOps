@@ -21,10 +21,10 @@
       tags:
         - certs
 
-- import_playbook: install_helm.yml
-  when: state == 'present'
-  tags:
-    - helm
+# - import_playbook: install_helm.yml
+#   when: state == 'present'
+#   tags:
+#     - helm
 
 - name: "{{ state }}ing RKE2 nodes "
   hosts: ClusterGroup
