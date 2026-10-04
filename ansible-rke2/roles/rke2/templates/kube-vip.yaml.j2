@@ -84,7 +84,7 @@ spec:
       containers:
         - name: kube-vip
           image: ghcr.io/kube-vip/kube-vip:v1.0.3
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
 
           args:
             - manager

@@ -115,6 +115,12 @@ configs:
       url: https://github.com/KingRiq/CoreApplications.git
       username: KingRiq
       password: "{{ git_pat }}"
+    clusterapplication:
+      type: git
+      name: coreapplications
+      url: https://git.moonlightgrove.love/ShadowGalactica/Applications.git
+      username: admin
+      password: "{{ gitea_pat }}"
 
 applicationSet:
   enabled: true

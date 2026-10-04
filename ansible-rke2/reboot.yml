@@ -5,7 +5,7 @@
   hosts: ClusterGroup
   become: true
   gather_facts: false
-
+  serial: 3
   tasks:
     - name: Reboot host
       ansible.builtin.reboot:

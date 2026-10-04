@@ -1,9 +1,14 @@
-- name: Check if any Ansible Galaxy collections are installed
+- name: Install required Ansible Galaxy collections
   hosts: localhost
-  stat:
-    path: "{{ lookup('env','HOME') }}/.ansible/collections/ansible_collections"
-  register: collections_dir
+  connection: local
+  gather_facts: false
 
-- name: Install required collections
-  command: ansible-galaxy collection install -r requirements.yml
-  when: not collections_dir.stat.exists
+  tasks:
+    - name: Install collections from requirements.yml
+      ansible.builtin.command:
+        argv:
+          - ansible-galaxy
+          - collection
+          - install
+          - -r
+          - "{{ playbook_dir }}/requirements.yml"

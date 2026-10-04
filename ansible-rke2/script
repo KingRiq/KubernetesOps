@@ -1,0 +1,17 @@
+systemd-run --unit=resize-vm-home /bin/bash -c '
+set -e
+cp -an /etc/fstab /etc/fstab.before-home
+sed -i "\|^[^#].*[[:space:]]/home[[:space:]]| s|^|#|" /etc/fstab
+systemctl stop gdm
+loginctl terminate-user rocky9 || true
+sleep 3
+cd /
+umount /home
+lvremove -y /dev/rl/home
+lvextend -l +100%FREE /dev/rl/root
+xfs_growfs /
+install -d -m 700 -o rocky9 -g rocky9 /home/rocky9
+restorecon -RF /home
+systemctl daemon-reload
+df -h /
+'

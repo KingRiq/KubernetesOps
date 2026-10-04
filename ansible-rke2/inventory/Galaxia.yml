@@ -12,46 +12,6 @@ all:
         gateway: 192.168.0.1
         dns: 192.168.0.1
 
-    lunap:
-      ansible_host: 192.168.0.144
-      ansible_user: rocky9
-      internal_address:
-        ip: 10.22.6.98
-        gateway: 10.22.6.1
-        dns: 10.22.6.1
-      external_address:
-        ip: 192.168.0.98
-        gateway: 192.168.0.1
-        dns: 192.168.0.1
-
-    diana:
-      ansible_host: 192.168.0.29
-      ansible_user: rocky9
-      external_address:
-        ip: 192.168.0.99
-        gateway: 192.168.0.1
-        dns: 192.168.0.1
-    
-    d1:
-      ansible_host: 192.168.0.30
-      ansible_user: rocky9
-      external_address:
-        ip: 192.168.0.108
-        gateway: 192.168.0.1
-        dns: 192.168.0.1
-
-    g1:
-      ansible_host: 10.22.6.111
-      ansible_user: rocky9
-      internal_address:
-        ip: 10.22.6.101
-        gateway: 10.22.6.1
-        dns: 10.22.6.1
-      external_address:
-        ip: 192.168.0.101
-        gateway: 192.168.0.1
-        dns: 192.168.0.1
-
     g2:
       ansible_host: 10.22.6.113
       ansible_user: rocky9
@@ -87,6 +47,47 @@ all:
         ip: 192.168.0.104
         gateway: 192.168.0.1
         dns: 192.168.0.1
+        
+    diana:
+      ansible_host: 192.168.0.29
+      ansible_user: rocky9
+      external_address:
+        ip: 192.168.0.99
+        gateway: 192.168.0.1
+        dns: 192.168.0.1
+    
+    d1:
+      ansible_host: 192.168.0.30
+      ansible_user: rocky9
+      external_address:
+        ip: 192.168.0.108
+        gateway: 192.168.0.1
+        dns: 192.168.0.1
+    lunap:
+      ansible_host: 192.168.0.144
+      ansible_user: rocky9
+      internal_address:
+        ip: 10.22.6.98
+        gateway: 10.22.6.1
+        dns: 10.22.6.1
+      external_address:
+        ip: 192.168.0.98
+        gateway: 192.168.0.1
+        dns: 192.168.0.1
+
+
+    g1:
+      ansible_host: 10.22.6.111
+      ansible_user: rocky9
+      internal_address:
+        ip: 10.22.6.101
+        gateway: 10.22.6.1
+        dns: 10.22.6.1
+      external_address:
+        ip: 192.168.0.101
+        gateway: 192.168.0.1
+        dns: 192.168.0.1
+
     l1:
       ansible_host: 192.168.0.176
       ansible_user: rocky9
