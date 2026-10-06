@@ -118,7 +118,9 @@
           - --delete-emptydir-data
           - --force
           - --timeout=300s
-      delegate_to: "{{ control_node_ip }}"
+      delegate_to: "{{ control_node }}"
+      vars:
+        ansible_host: "{{ hostvars[inventory_hostname].control_node_ip }}"
       register: drain_result
       changed_when: true
     
@@ -139,7 +141,9 @@
           - get
           - nodes.longhorn.io
           - "{{ inventory_hostname }}"
-      delegate_to: "{{ control_node_ip }}"
+      delegate_to: "{{ control_node }}"
+      vars:
+        ansible_host: "{{ hostvars[inventory_hostname].control_node_ip }}"
       register: longhorn_node
       failed_when: false
       changed_when: false
@@ -158,7 +162,9 @@
           - --type=merge
           - -p
           - '{"spec":{"allowScheduling":false}}'
-      delegate_to: "{{ control_node_ip }}"
+      delegate_to: "{{ control_node }}"
+      vars:
+        ansible_host: "{{ hostvars[inventory_hostname].control_node_ip }}"
       when: longhorn_node.rc == 0
       changed_when: true
 
@@ -218,7 +224,9 @@
           - node
           - "{{ inventory_hostname }}"
           - --ignore-not-found=true
-      delegate_to: "{{ control_node_ip }}"
+            delegate_to: "{{ control_node }}"
+      vars:
+        ansible_host: "{{ hostvars[inventory_hostname].control_node_ip }}"
       register: delete_node
       changed_when: true
 
@@ -256,7 +264,9 @@
           - get
           - node
           - "{{ inventory_hostname }}"
-      delegate_to: "{{ control_node_ip }}"
+      delegate_to: "{{ control_node }}"
+      vars:
+        ansible_host: "{{ hostvars[inventory_hostname].control_node_ip }}"
       register: node_check
       failed_when: false
       changed_when: false
