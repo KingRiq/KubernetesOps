@@ -101,33 +101,9 @@
   tasks:
 
     #################################################################
-    # CONTROL PLANE
-    #
-    # Drain worker.
-    #################################################################
-
-    - name: Drain worker
-      ansible.builtin.command:
-        argv:
-          - /var/lib/rancher/rke2/bin/kubectl
-          - --kubeconfig
-          - /etc/rancher/rke2/rke2.yaml
-          - drain
-          - "{{ inventory_hostname }}"
-          - --ignore-daemonsets
-          - --delete-emptydir-data
-          - --force
-          - --timeout=300s
-      delegate_to: "{{ control_node }}"
-      vars:
-        ansible_host: "{{ hostvars[inventory_hostname].control_node_ip }}"
-      register: drain_result
-      changed_when: true
-    
-      #################################################################
     # LONGHORN
     #
-    # Disable scheduling on the Longhorn node first.
+    # Disable scheduling BEFORE draining the node.
     #################################################################
 
     - name: Check whether worker exists in Longhorn
@@ -166,6 +142,31 @@
       vars:
         ansible_host: "{{ hostvars[inventory_hostname].control_node_ip }}"
       when: longhorn_node.rc == 0
+      changed_when: true
+
+
+    #################################################################
+    # CONTROL PLANE
+    #
+    # Drain worker.
+    #################################################################
+
+    - name: Drain worker
+      ansible.builtin.command:
+        argv:
+          - /var/lib/rancher/rke2/bin/kubectl
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - drain
+          - "{{ inventory_hostname }}"
+          - --ignore-daemonsets
+          - --delete-emptydir-data
+          - --force
+          - --timeout=300s
+      delegate_to: "{{ control_node }}"
+      vars:
+        ansible_host: "{{ hostvars[inventory_hostname].control_node_ip }}"
+      register: drain_result
       changed_when: true
 
     - name: Display drain result
@@ -224,7 +225,7 @@
           - node
           - "{{ inventory_hostname }}"
           - --ignore-not-found=true
-            delegate_to: "{{ control_node }}"
+      delegate_to: "{{ control_node }}"
       vars:
         ansible_host: "{{ hostvars[inventory_hostname].control_node_ip }}"
       register: delete_node
@@ -239,8 +240,6 @@
     # WORKER
     #
     # Remove local agent state.
-    #
-    # RKE2 itself remains installed.
     #################################################################
 
     - name: Remove RKE2 agent state
