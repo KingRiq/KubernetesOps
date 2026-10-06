@@ -83,6 +83,8 @@
           - get
           - --raw=/readyz
       delegate_to: "{{ control_node }}"
+      vars:
+        ansible_host: "{{ control_node_ip }}"
       register: control_ready
       changed_when: false
 
