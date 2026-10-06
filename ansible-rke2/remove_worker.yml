@@ -84,7 +84,7 @@
           - --raw=/readyz
       delegate_to: "{{ control_node }}"
       vars:
-        ansible_host: "{{ control_node_ip }}"
+        ansible_host: "{{ hostvars[inventory_hostname].control_node_ip }}"
       register: control_ready
       changed_when: false
 
