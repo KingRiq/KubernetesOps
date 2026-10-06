@@ -82,7 +82,7 @@
           - /etc/rancher/rke2/rke2.yaml
           - get
           - --raw=/readyz
-      delegate_to: "{{ control_node_ip }}"
+      delegate_to: "{{ control_node }}"
       register: control_ready
       changed_when: false
 
