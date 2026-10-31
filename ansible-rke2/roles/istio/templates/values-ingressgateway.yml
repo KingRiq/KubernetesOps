@@ -1,6 +1,6 @@
 service:
   type: LoadBalancer
-    ports:
+  ports:
     - name: status-port
       port: 15021
       targetPort: 15021
@@ -21,8 +21,5 @@ service:
       targetPort: 22
       protocol: TCP
 
-# Stable names/labels make targeting simpler:
 labels:
   istio: ingressgateway
-
-platform: openshift
