@@ -151,13 +151,13 @@
         path: /usr/bin/rke2-uninstall.sh
       register: rke2_uninstall
 
-    - name: Run uninstall script
-      ansible.builtin.command:
-        cmd: /usr/bin/rke2-uninstall.sh
-      when: rke2_uninstall.stat.exists
-      register: uninstall_result
-      failed_when: false
-      changed_when: true
+    # - name: Run uninstall script
+    #   ansible.builtin.command:
+    #     cmd: /usr/bin/rke2-uninstall.sh
+    #   when: rke2_uninstall.stat.exists
+    #   register: uninstall_result
+    #   failed_when: false
+    #   changed_when: true
 
 
     #################################################################
