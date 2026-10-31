@@ -1,5 +1,25 @@
 service:
   type: LoadBalancer
+    ports:
+    - name: status-port
+      port: 15021
+      targetPort: 15021
+      protocol: TCP
+
+    - name: http2
+      port: 80
+      targetPort: 80
+      protocol: TCP
+
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP
+
+    - name: tcp-gitea-ssh
+      port: 22
+      targetPort: 22
+      protocol: TCP
 
 # Stable names/labels make targeting simpler:
 labels:
