@@ -3,7 +3,7 @@
 #Sucks to suck.. lets install it I guess
 
 - name: Install Latest Helm
-  hosts: control
+  hosts: all
   become: yes
   vars: 
     helm_arch: linux-amd64
