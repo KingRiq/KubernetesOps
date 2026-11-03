@@ -37,7 +37,7 @@ rke_ports:
     protocol: tcp
   - port: 8080
     protocol: udp
-  - port: 2222.       # port im using for ssh routing
+  - port: 2222       # port im using for ssh routing
     protocol: tcp
   - port: 2222
     protocol: udp
