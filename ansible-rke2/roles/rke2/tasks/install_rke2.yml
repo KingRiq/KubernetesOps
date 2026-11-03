@@ -15,11 +15,39 @@
     cmd: dnf clean all
   changed_when: false
 
+- name: Get latest RKE2 version from GitHub
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/rancher/rke2/releases/latest
+    method: GET
+    return_content: true
+  register: rke2_release
+  delegate_to: localhost
+  run_once: true
+  changed_when: false
+
+- name: Store latest RKE2 version
+  ansible.builtin.set_fact:
+    rke2_latest_version: "{{ rke2_release.json.tag_name }}"
+
+- name: Display latest RKE2 version
+  ansible.builtin.debug:
+    msg: "Latest RKE2 version: {{ rke2_latest_version }}"
+- name: Display latest RKE2 version
+  ansible.builtin.debug:
+    msg: "Latest RKE2 version: {{ rke2_latest_version }}"
+
 - name: Download and install RKE2
-  shell: |
-    curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE={{ 'server' if inventory_hostname in groups['control'] else 'agent' }} sh -
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -fsSL https://get.rke2.io | \
+      INSTALL_RKE2_VERSION="{{ rke2_latest_version }}" \
+      INSTALL_RKE2_CHANNEL=latest \
+      INSTALL_RKE2_METHOD=rpm \
+      INSTALL_RKE2_TYPE="{{ 'server' if inventory_hostname in groups['control'] else 'agent' }}" \
+      sh -
   args:
-    creates: /usr/local/bin/rke2
+    executable: /bin/bash
+  become: true
 
 - name: Ensure Python3 and pip installed (Rocky/RedHat)
   ansible.builtin.package:
