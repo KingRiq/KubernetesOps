@@ -1,296 +1,240 @@
+
 #!/usr/bin/env bash
 set -euo pipefail
 
-LABEL="CC"
-MOUNTPOINT="/mnt/windows/share/Chaos_Cauldron"
+# ==========================================
+# Chaos Cauldron Multi-Drive Mount Setup
+# Rocky Linux 9
+# ==========================================
+
+# Ordered configuration: parent drive first.
+LABELS=("CC" "APPLE")
+
+MOUNTPOINTS=(
+    "/mnt/windows/share/Chaos_Cauldron"
+    "/mnt/windows/share/Chaos_Cauldron/Apple"
+)
 
 echo "=========================================="
 echo " Chaos Cauldron XFS Mount Setup"
 echo "=========================================="
-echo
 
-#
-# Find filesystem by LABEL
-#
-echo "=== Finding XFS drive ==="
-
-DEVICE="$(blkid -L "$LABEL" 2>/dev/null || true)"
-
-if [ -z "$DEVICE" ]; then
-    echo "ERROR: Could not find filesystem labeled: $LABEL"
-    echo
-    echo "Available filesystems:"
-    lsblk -f
-    echo
-    blkid || true
+if [[ $EUID -ne 0 ]]; then
+    echo "ERROR: Run as root."
     exit 1
 fi
 
-REAL_DEVICE="$(readlink -f "$DEVICE")"
+# ==========================================
+# Preflight: Resolve and validate both drives
+# ==========================================
 
-echo "Found:"
-echo "  Label:  $LABEL"
-echo "  Device: $DEVICE"
-echo "  Real:   $REAL_DEVICE"
-echo
+declare -a DEVICES UUIDS
 
+for i in "${!LABELS[@]}"; do
+    LABEL="${LABELS[$i]}"
+    MP="${MOUNTPOINTS[$i]}"
 
-#
-# Verify filesystem
-#
-echo "=== Verifying filesystem ==="
+    DEVICE="$(blkid -L "$LABEL" 2>/dev/null || true)"
 
-FSTYPE="$(blkid -s TYPE -o value "$REAL_DEVICE" 2>/dev/null || true)"
-UUID="$(blkid -s UUID -o value "$REAL_DEVICE" 2>/dev/null || true)"
-
-if [ "$FSTYPE" != "xfs" ]; then
-    echo "ERROR: Expected XFS but found: ${FSTYPE:-none}"
-    exit 1
-fi
-
-if [ -z "$UUID" ]; then
-    echo "ERROR: Could not determine filesystem UUID."
-    exit 1
-fi
-
-echo "Filesystem: $FSTYPE"
-echo "UUID:       $UUID"
-echo
-
-
-#
-# Prepare mountpoint
-#
-echo "=== Preparing mountpoint ==="
-
-mkdir -p "$MOUNTPOINT"
-
-echo "Mountpoint:"
-echo "  $MOUNTPOINT"
-echo
-
-
-#
-# Determine whether something is mounted EXACTLY
-# at the desired mountpoint.
-#
-echo "=== Checking current mount ==="
-
-CURRENT_SOURCE="$(findmnt -rn -M "$MOUNTPOINT" -o SOURCE 2>/dev/null || true)"
-CURRENT_UUID="$(findmnt -rn -M "$MOUNTPOINT" -o UUID 2>/dev/null || true)"
-
-if [ -n "$CURRENT_SOURCE" ]; then
-
-    echo "Something is already mounted here:"
-    echo "  Source: $CURRENT_SOURCE"
-    echo "  UUID:   ${CURRENT_UUID:-unknown}"
-    echo
-
-    #
-    # Make sure it is OUR filesystem.
-    #
-    if [ "$CURRENT_UUID" != "$UUID" ]; then
-        echo "ERROR: A different filesystem is mounted at:"
-        echo "  $MOUNTPOINT"
-        echo
-        echo "Expected UUID:"
-        echo "  $UUID"
-        echo
-        echo "Found UUID:"
-        echo "  ${CURRENT_UUID:-unknown}"
-        echo
-        echo "Refusing to continue."
+    if [[ -z "$DEVICE" ]]; then
+        echo "ERROR: Cannot find drive labeled $LABEL"
+        lsblk -f
         exit 1
     fi
 
-    echo "Correct filesystem is already mounted."
+    DEVICE="$(readlink -f "$DEVICE")"
+    FSTYPE="$(blkid -s TYPE -o value "$DEVICE" || true)"
+    UUID="$(blkid -s UUID -o value "$DEVICE" || true)"
 
-else
-
-    echo "Nothing is currently mounted at:"
-    echo "  $MOUNTPOINT"
-    echo
-
-    #
-    # Check whether files accidentally exist in the
-    # underlying directory on the root filesystem.
-    #
-    if [ -n "$(find "$MOUNTPOINT" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
-
-        echo "ERROR: The mountpoint contains files while CC is NOT mounted."
-        echo
-        echo "These files are currently stored on the underlying"
-        echo "root filesystem and would become hidden after mounting CC."
-        echo
-        echo "Contents:"
-        echo
-
-        ls -lah "$MOUNTPOINT"
-
-        echo
-        echo "Disk usage:"
-        du -sh "$MOUNTPOINT" || true
-
-        echo
-        echo "Move/remove these files before running this script again."
+    if [[ "$FSTYPE" != "xfs" || -z "$UUID" ]]; then
+        echo "ERROR: $LABEL must be an XFS filesystem with a UUID."
         exit 1
     fi
 
-    chmod 775 "$MOUNTPOINT"
+    DEVICES[$i]="$DEVICE"
+    UUIDS[$i]="$UUID"
+
+    echo "$LABEL: $DEVICE -> $MP"
+    echo "UUID: $UUID"
+done
+
+if [[ "${UUIDS[0]}" == "${UUIDS[1]}" ]]; then
+    echo "ERROR: Both drives have the same filesystem UUID."
+    exit 1
 fi
 
-echo
+# ==========================================
+# Mount helper
+# ==========================================
 
+mount_drive() {
+    local LABEL="$1"
+    local DEVICE="$2"
+    local UUID="$3"
+    local MP="$4"
 
-#
-# Check whether CC happens to already be mounted
-# somewhere else.
-#
-echo "=== Checking for other mounts of CC ==="
+    echo
+    echo "=========================================="
+    echo " Processing $LABEL"
+    echo "=========================================="
 
-OTHER_MOUNTS="$(findmnt -rn -S "$REAL_DEVICE" -o TARGET 2>/dev/null || true)"
+    mkdir -p "$MP"
 
-if [ -n "$OTHER_MOUNTS" ]; then
+    # Check if already mounted at target
+    local CURRENT_UUID
+    CURRENT_UUID="$(
+        findmnt -rn -M "$MP" -o UUID 2>/dev/null || true
+    )"
 
-    FOUND_EXPECTED="false"
-
-    while IFS= read -r TARGET; do
-        [ -z "$TARGET" ] && continue
-
-        if [ "$TARGET" = "$MOUNTPOINT" ]; then
-            FOUND_EXPECTED="true"
-        else
-            echo "ERROR: $REAL_DEVICE is already mounted somewhere else:"
-            echo "  $TARGET"
-            echo
-            echo "Expected mountpoint:"
-            echo "  $MOUNTPOINT"
-            echo
-            echo "Refusing to mount the filesystem twice."
+    if mountpoint -q "$MP"; then
+        if [[ "$CURRENT_UUID" != "$UUID" ]]; then
+            echo "ERROR: Wrong filesystem mounted at $MP"
             exit 1
         fi
-    done <<< "$OTHER_MOUNTS"
-
-fi
-
-echo "No conflicting mounts found."
-echo
-
-
-#
-# Update /etc/fstab
-#
-echo "=== Updating /etc/fstab ==="
-
-FSTAB_BACKUP="/etc/fstab.bak.$(date +%Y%m%d-%H%M%S)"
-
-cp -a /etc/fstab "$FSTAB_BACKUP"
-
-echo "Backup created:"
-echo "  $FSTAB_BACKUP"
-echo
-
-FSTAB_TEMP="$(mktemp)"
-
-#
-# Remove:
-#   - any existing entry using this mountpoint
-#   - any existing entry using this filesystem UUID
-#
-awk \
-    -v mp="$MOUNTPOINT" \
-    -v uuid="UUID=$UUID" '
-    $2 == mp { next }
-    $1 == uuid { next }
-    { print }
-' /etc/fstab > "$FSTAB_TEMP"
-
-#
-# Add canonical entry
-#
-echo "UUID=$UUID  $MOUNTPOINT  xfs  defaults,noatime,nofail  0  0" >> "$FSTAB_TEMP"
-
-cat "$FSTAB_TEMP" > /etc/fstab
-rm -f "$FSTAB_TEMP"
-
-systemctl daemon-reload
-
-echo "fstab entry:"
-echo "  UUID=$UUID  $MOUNTPOINT  xfs  defaults,noatime,nofail  0  0"
-echo
-
-
-#
-# Mount filesystem
-#
-echo "=== Mounting ==="
-
-CURRENT_SOURCE="$(findmnt -rn -M "$MOUNTPOINT" -o SOURCE 2>/dev/null || true)"
-CURRENT_UUID="$(findmnt -rn -M "$MOUNTPOINT" -o UUID 2>/dev/null || true)"
-
-if [ -n "$CURRENT_SOURCE" ]; then
-
-    if [ "$CURRENT_UUID" = "$UUID" ]; then
-        echo "Already mounted correctly:"
-        echo "  $CURRENT_SOURCE -> $MOUNTPOINT"
+        echo "$LABEL already mounted correctly."
     else
-        echo "ERROR: Unexpected filesystem appeared at mountpoint."
-        echo "Expected UUID: $UUID"
-        echo "Found UUID:    ${CURRENT_UUID:-unknown}"
+        # Don't hide existing files
+        if [[ -n "$(find "$MP" -mindepth 1 -maxdepth 1 \
+            -print -quit)" ]]; then
+            echo "ERROR: Mountpoint contains files:"
+            ls -lah "$MP"
+            exit 1
+        fi
+
+        # Don't mount the same drive in two places
+        local OTHER_MOUNTS
+        OTHER_MOUNTS="$(
+            findmnt -rn -S "$DEVICE" -o TARGET 2>/dev/null || true
+        )"
+
+        if [[ -n "$OTHER_MOUNTS" ]]; then
+            echo "ERROR: $LABEL is already mounted at:"
+            echo "$OTHER_MOUNTS"
+            exit 1
+        fi
+    fi
+
+    # Mount if not already mounted
+    if ! mountpoint -q "$MP"; then
+        echo "Mounting $LABEL..."
+        mount -t xfs -o defaults,noatime "$DEVICE" "$MP"
+    fi
+
+    # Verify UUID
+    CURRENT_UUID="$(
+        findmnt -rn -M "$MP" -o UUID 2>/dev/null || true
+    )"
+
+    if [[ "$CURRENT_UUID" != "$UUID" ]]; then
+        echo "ERROR: Mount verification failed for $LABEL"
         exit 1
     fi
 
-else
+    echo "SUCCESS: $LABEL"
+    findmnt -M "$MP"
+    df -h "$MP"
+}
 
-    echo "Mounting:"
-    echo "  UUID=$UUID"
-    echo "  -> $MOUNTPOINT"
-    echo
+# ==========================================
+# Mount parent, then child
+# ==========================================
 
-    mount "$MOUNTPOINT"
-fi
+for i in "${!LABELS[@]}"; do
+    mount_drive \
+        "${LABELS[$i]}" \
+        "${DEVICES[$i]}" \
+        "${UUIDS[$i]}" \
+        "${MOUNTPOINTS[$i]}"
+done
+
+# ==========================================
+# Update /etc/fstab after successful mounts
+# ==========================================
 
 echo
+echo "=== Updating /etc/fstab ==="
 
+BACKUP="/etc/fstab.bak.$(date +%Y%m%d-%H%M%S)"
+cp -a /etc/fstab "$BACKUP"
 
-#
-# Final verification
-#
-echo "=== Verification ==="
+TEMP="$(mktemp)"
+trap 'rm -f "$TEMP"' EXIT
 
-MOUNTED_UUID="$(findmnt -rn -M "$MOUNTPOINT" -o UUID 2>/dev/null || true)"
+# Remove previous entries for either mountpoint,
+# UUID, label, or resolved device.
+awk \
+    -v mp1="${MOUNTPOINTS[0]}" \
+    -v mp2="${MOUNTPOINTS[1]}" \
+    -v uuid1="UUID=${UUIDS[0]}" \
+    -v uuid2="UUID=${UUIDS[1]}" \
+    -v label1="LABEL=${LABELS[0]}" \
+    -v label2="LABEL=${LABELS[1]}" \
+    -v dev1="${DEVICES[0]}" \
+    -v dev2="${DEVICES[1]}" '
+    $2 == mp1 || $2 == mp2 { next }
+    $1 == uuid1 || $1 == uuid2 { next }
+    $1 == label1 || $1 == label2 { next }
+    $1 == dev1 || $1 == dev2 { next }
+    { print }
+' /etc/fstab > "$TEMP"
 
-if [ "$MOUNTED_UUID" != "$UUID" ]; then
-    echo "ERROR: Mount verification failed."
-    echo
-    echo "Expected UUID:"
-    echo "  $UUID"
-    echo
-    echo "Mounted UUID:"
-    echo "  ${MOUNTED_UUID:-none}"
+# Parent mount
+printf 'UUID=%s %s xfs defaults,noatime,nofail 0 0\n' \
+    "${UUIDS[0]}" "${MOUNTPOINTS[0]}" >> "$TEMP"
+
+# Child mount explicitly depends on parent
+printf 'UUID=%s %s xfs defaults,noatime,nofail,x-systemd.requires-mounts-for=%s 0 0\n' \
+    "${UUIDS[1]}" "${MOUNTPOINTS[1]}" \
+    "${MOUNTPOINTS[0]}" >> "$TEMP"
+
+# Validate fstab before replacing it
+if ! findmnt --verify --tab-file "$TEMP"; then
+    echo "ERROR: fstab validation failed."
+    echo "Original fstab remains unchanged."
     exit 1
 fi
 
-findmnt "$MOUNTPOINT"
+cat "$TEMP" > /etc/fstab
+systemctl daemon-reload
 
-echo
-echo "=== Disk Usage ==="
+echo "fstab backup: $BACKUP"
 
-df -h "$MOUNTPOINT"
-
-echo
-echo "=== Contents ==="
-
-ls -lah "$MOUNTPOINT"
+# ==========================================
+# Final verification
+# ==========================================
 
 echo
 echo "=========================================="
-echo " SUCCESS"
+echo " Final Mount Verification"
 echo "=========================================="
+
+for i in "${!LABELS[@]}"; do
+    LABEL="${LABELS[$i]}"
+    MP="${MOUNTPOINTS[$i]}"
+    UUID="${UUIDS[$i]}"
+
+    ACTUAL_UUID="$(
+        findmnt -rn -M "$MP" -o UUID 2>/dev/null || true
+    )"
+
+    if [[ "$ACTUAL_UUID" != "$UUID" ]]; then
+        echo "ERROR: $LABEL verification failed."
+        exit 1
+    fi
+
+    echo
+    echo "Label: $LABEL"
+    echo "UUID:  $UUID"
+    findmnt -M "$MP"
+    df -h "$MP"
+done
+
 echo
-echo "Label:      $LABEL"
-echo "Device:     $REAL_DEVICE"
-echo "UUID:       $UUID"
-echo "Filesystem: $FSTYPE"
-echo "Mountpoint: $MOUNTPOINT"
+echo "=========================================="
+echo " SUCCESS - BOTH DRIVES MOUNTED"
+echo "=========================================="
+
+echo
+echo "CC:    ${MOUNTPOINTS[0]}"
+echo "Apple: ${MOUNTPOINTS[1]}"
 echo
