@@ -2,7 +2,7 @@
 
 **A personal Kubernetes homelab, built and maintained as a learning environment.**
 
-This repository contains Ansible automation, RKE2 cluster operations, storage tooling, and the bootstrap configuration for a self-hosted Kubernetes environment. Application-level GitOps configuration is maintained separately in [CoreApplications](https://github.com/KingRiq/CoreApplications).
+This repository contains Ansible automation, RKE2 cluster operations, storage tooling, and the bootstrap configuration for a self-hosted Kubernetes environment.
 
 > [!NOTE]
 > This is an evolving homelab, not a production deployment guide. The repositories contain active configuration, experiments, legacy manifests, and planned integrations. A manifest in Git does **not** necessarily mean the service is currently deployed or healthy.
@@ -27,7 +27,7 @@ This repository contains Ansible automation, RKE2 cluster operations, storage to
 
 The cluster is organized around multiple RKE2 control-plane and worker nodes. Ansible manages node setup and lifecycle operations, including promotion, demotion, installation, removal, and supporting host configuration. Helm and Argo CD handle much of the Kubernetes-side deployment.
 
-The cluster configuration lives under [`ansible-rke2/`](ansible-rke2/). The linked application configurations live in [CoreApplications](https://github.com/KingRiq/CoreApplications).
+The cluster configuration lives under [`ansible-rke2/`](ansible-rke2/).
 
 ## Self-hosted services
 
@@ -77,8 +77,6 @@ This is the **actual Argo CD Application list visible in the supplied screenshot
 
 **Attention:** `argocd` and `istio` were OutOfSync; `nfsprovisioner` was Progressing. These are Argo CD health/sync indicators, not confirmation that every underlying feature is functioning correctly.
 
-Additional manifests and experiments may be found under `applications/`, `gitops/`, `temp/`, and `deprecated/` in CoreApplications.
-
 ## Storage design
 
 Storage is one of the main ongoing projects.
@@ -105,10 +103,7 @@ KubernetesOps/
     ├── promote.yml        # Control-plane promotion
     ├── demote.yml         # Control-plane demotion
     ├── remove_worker.yml  # Worker lifecycle
-    └── Applications/      # Linked application repository
 ```
-
-See [CoreApplications](https://github.com/KingRiq/CoreApplications) for Argo CD Applications, Helm values, Kubernetes manifests, ingress rules, and service configurations.
 
 ## Roadmap and TODOs
 
@@ -135,11 +130,6 @@ See [CoreApplications](https://github.com/KingRiq/CoreApplications) for Argo CD 
 - [ ] Explore container-image deployment for Saira's portfolio websites and whether a private image registry is needed.
 - [ ] Investigate an LLM-assisted music migration workflow.
 - [x] Select a domain for self-hosted services: **moonlightgrove.love**.
-
-## Related repositories
-
-- [**KubernetesOps**](https://github.com/KingRiq/KubernetesOps) — cluster operations and Ansible automation.
-- [**CoreApplications**](https://github.com/KingRiq/CoreApplications) — GitOps applications, Helm values, and Kubernetes manifests.
 
 ---
 
