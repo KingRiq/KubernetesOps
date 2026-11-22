@@ -120,6 +120,14 @@ KubernetesOps/
 - [ ] Check release naming and cluster-scoped RBAC for collisions.
 - [ ] Protect existing PVs/PVCs and backing directories during migration.
 
+### ChatGPT integration with self-hosted Gitea
+
+- [ ] Deploy a Gitea-compatible MCP server in the RKE2 cluster for `https://git.moonlightgrove.love`.
+- [ ] Connect the MCP server to the Gitea REST API (`/api/v1`) with a scoped access token stored in a Kubernetes Secret or secret manager; never commit credentials.
+- [ ] Secure the MCP endpoint with authentication and TLS, and restrict network access.
+- [ ] Configure a custom ChatGPT MCP connector, subject to account and connector availability.
+- [ ] Verify read access to private repositories, then separately enable and test scoped write operations for branches, commits, pull requests, and review comments.
+
 ### Documentation and experiments
 
 - [ ] Document service ownership, dependencies, and recovery steps.
