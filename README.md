@@ -16,7 +16,7 @@ This repository contains Ansible automation, RKE2 cluster operations, storage to
 | Automation | **Ansible**, **Helm** | Host setup, cluster bootstrap, and package deployment |
 | GitOps | **Argo CD** | Declarative application deployment and reconciliation |
 | Networking | **Calico / Canal**, **MetalLB**, **kube-vip** | Pod networking, LoadBalancer IPs, and API endpoint availability |
-| Ingress and routing | **Traefik**, **Istio** (legacy/experimental), **Nginx** (manifests) | HTTP(S) ingress and traffic routing |
+| Ingress and routing | **Traefik**, **Istio**, **Istio Ingress**; Nginx manifests (historical) | HTTP(S) ingress and traffic routing |
 | DNS and TLS | **Pi-hole**, **cert-manager**, **Let's Encrypt** | Local DNS, certificates, and service discovery |
 | Remote connectivity | **Tailscale** | Private remote access |
 | Storage | **Longhorn**, **NFS**, **Samba**, **XFS** | Persistent volumes, shared files, and host disks |
@@ -31,7 +31,7 @@ The cluster configuration lives under [`ansible-rke2/`](ansible-rke2/). The link
 
 ## Self-hosted services
 
-The following services appear in the application repository or have been part of the homelab. Their presence here is an **inventory of managed or explored technologies**, not a live status report.
+The screenshots provided on **November 21, 2026** show **23 Argo CD Applications**. The table below summarizes the broader stack; some entries are components within an Application, while others are experiments or repository configurations. The screenshots reflect a point-in-time status, not ongoing health monitoring.
 
 | Category | Services | Purpose |
 | --- | --- | --- |
@@ -41,9 +41,41 @@ The following services appear in the application repository or have been part of
 | Developer tooling | **Gitea**, **Jenkins** | Git repositories and automated builds |
 | Files and synchronization | **File Browser**, **Syncthing**, **Unison** (experimental) | File management and synchronization between storage hosts |
 | Identity and secrets | **Keycloak** (experimental), **Vaultwarden** | Identity experiments and password management |
-| Infrastructure UI | **Rancher** (experimental / compatibility work) | Kubernetes administration |
+| Infrastructure UI | **Rancher** (deployed in Argo CD) | Kubernetes administration |
 | DNS and networking | **Pi-hole**, **Tailscale**, **Traefik** | DNS, private connectivity, and ingress |
 | Platform maintenance | **Descheduler**, **Reloader** | Scheduling and configuration-change automation |
+
+### Argo CD application inventory (November 21, 2026)
+
+This is the **actual Argo CD Application list visible in the supplied screenshots**, rather than a list inferred solely from Git manifests.
+
+| Application | Namespace | Screenshot status |
+| --- | --- | --- |
+| `argocd` | `argocd` | Healthy · OutOfSync |
+| `arrstack` | `arrstack` | Healthy · Synced |
+| `filesystem` | `filesystem` | Healthy · Synced |
+| `galaxia` | `cluster-utils` | Healthy · Synced |
+| `gitea` | `git` | Healthy · Synced |
+| `immich` | `immich` | Healthy · Synced |
+| `istio` | `istio-system` | Healthy · OutOfSync |
+| `istio-ingress` | `istio-ingress` | Healthy · Synced |
+| `jellyfin` | `media` | Healthy · Synced |
+| `jenkins` | `jenkins` | Healthy · Synced |
+| `komga` | `manga` | Healthy · Synced |
+| `longhorn` | `longhorn-system` | Healthy · Synced |
+| `maintenance` | `maintenance` | Healthy · Synced |
+| `nextcloud` | `nextcloud` | Healthy · Synced |
+| `nfs` | `storage` | Healthy · Synced |
+| `nfsprovisioner` | `storage` | Progressing · Synced |
+| `pihole` | `pihole` | Healthy · Synced |
+| `qbittorrent` | `media` | Healthy · Synced |
+| `rancher` | `cattle-system` | Healthy · Synced |
+| `reloader` | `reloader` | Healthy · Synced |
+| `tailscale` | `tailscale` | Healthy · Synced |
+| `traefik` | `traefik` | Healthy · Synced |
+| `vaultwarden` | `vaultwarden` | Healthy · Synced |
+
+**Attention:** `argocd` and `istio` were OutOfSync; `nfsprovisioner` was Progressing. These are Argo CD health/sync indicators, not confirmation that every underlying feature is functioning correctly.
 
 Additional manifests and experiments may be found under `applications/`, `gitops/`, `temp/`, and `deprecated/` in CoreApplications.
 
