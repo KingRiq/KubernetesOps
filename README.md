@@ -45,37 +45,35 @@ The screenshots provided on **November 21, 2026** show **23 Argo CD Applications
 | DNS and networking | **Pi-hole**, **Tailscale**, **Traefik** | DNS, private connectivity, and ingress |
 | Platform maintenance | **Descheduler**, **Reloader** | Scheduling and configuration-change automation |
 
-### Argo CD application inventory (November 21, 2026)
+### Cluster software and services
 
-This is the **actual Argo CD Application list visible in the supplied screenshots**, rather than a list inferred solely from Git manifests.
+The following table describes the applications and platform components used in the homelab and the capabilities they provide. It is a functional inventory, not a live deployment or health report.
 
-| Application | Namespace | Screenshot status |
-| --- | --- | --- |
-| `argocd` | `argocd` | Healthy · OutOfSync |
-| `arrstack` | `arrstack` | Healthy · Synced |
-| `filesystem` | `filesystem` | Healthy · Synced |
-| `galaxia` | `cluster-utils` | Healthy · Synced |
-| `gitea` | `git` | Healthy · Synced |
-| `immich` | `immich` | Healthy · Synced |
-| `istio` | `istio-system` | Healthy · OutOfSync |
-| `istio-ingress` | `istio-ingress` | Healthy · Synced |
-| `jellyfin` | `media` | Healthy · Synced |
-| `jenkins` | `jenkins` | Healthy · Synced |
-| `komga` | `manga` | Healthy · Synced |
-| `longhorn` | `longhorn-system` | Healthy · Synced |
-| `maintenance` | `maintenance` | Healthy · Synced |
-| `nextcloud` | `nextcloud` | Healthy · Synced |
-| `nfs` | `storage` | Healthy · Synced |
-| `nfsprovisioner` | `storage` | Progressing · Synced |
-| `pihole` | `pihole` | Healthy · Synced |
-| `qbittorrent` | `media` | Healthy · Synced |
-| `rancher` | `cattle-system` | Healthy · Synced |
-| `reloader` | `reloader` | Healthy · Synced |
-| `tailscale` | `tailscale` | Healthy · Synced |
-| `traefik` | `traefik` | Healthy · Synced |
-| `vaultwarden` | `vaultwarden` | Healthy · Synced |
-
-**Attention:** `argocd` and `istio` were OutOfSync; `nfsprovisioner` was Progressing. These are Argo CD health/sync indicators, not confirmation that every underlying feature is functioning correctly.
+| Software | Role in the cluster |
+| --- | --- |
+| **Argo CD** | GitOps reconciliation and declarative deployment of Kubernetes applications |
+| **Arrstack** (Sonarr, Radarr, Bazarr, Prowlarr, Seerr / Overseerr, FlareSolverr) | Media discovery, indexing, subtitles, and library/request automation |
+| **File Browser** | Web-based browsing and management of shared files |
+| **Galaxia** | Cluster-specific utility workloads and supporting configuration |
+| **Gitea** | Self-hosted Git repositories and source control |
+| **Immich** | Self-hosted photo and video backup, organization, and search |
+| **Istio** | Service-mesh control plane, traffic policy, and custom resource definitions |
+| **Istio Ingress** | Istio ingress gateway and routing of incoming traffic |
+| **Jellyfin** | Media streaming |
+| **Jenkins** | Continuous integration and build automation |
+| **Komga** | Manga and comics library server |
+| **Longhorn** | Replicated Kubernetes block storage and volume backups |
+| **Maintenance** | Cluster maintenance and scheduling utilities |
+| **Nextcloud** | Personal file hosting and synchronization |
+| **NFS** | Shared network filesystem exports for workloads |
+| **NFS Subdir External Provisioner** | Dynamic provisioning of Kubernetes persistent volumes on NFS exports |
+| **Pi-hole** | Network DNS filtering and local DNS records |
+| **qBittorrent** | Download client for the media workflow |
+| **Rancher** | Kubernetes cluster administration interface |
+| **Reloader** | Restarting workloads when referenced ConfigMaps or Secrets change |
+| **Tailscale** | Private remote network connectivity |
+| **Traefik** | Reverse proxy and Kubernetes ingress routing |
+| **Vaultwarden** | Self-hosted password manager compatible with Bitwarden clients |
 
 ## Storage design
 
