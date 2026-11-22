@@ -1,62 +1,114 @@
 # KubernetesOps
 
-A personal homelab repository for learning, experimenting with, and operating Kubernetes. It contains infrastructure configurations, application deployments, and notes from building a self-hosted environment.
+**A personal Kubernetes homelab, built and maintained as a learning environment.**
 
-> **Work in progress:** This is an evolving lab, not a production-ready reference implementation. Some configurations are experimental or intentionally kept for learning.
+This repository contains Ansible automation, RKE2 cluster operations, storage tooling, and the bootstrap configuration for a self-hosted Kubernetes environment. Application-level GitOps configuration is maintained separately in [CoreApplications](https://github.com/KingRiq/CoreApplications).
 
-## Overview
+> [!NOTE]
+> This is an evolving homelab, not a production deployment guide. The repositories contain active configuration, experiments, legacy manifests, and planned integrations. A manifest in Git does **not** necessarily mean the service is currently deployed or healthy.
 
-The environment uses Kubernetes to orchestrate self-hosted services and experiments across multiple machines. Areas of focus include persistent storage, file sharing, networking, application availability, and repeatable operations.
+## Architecture at a glance
 
-## Technology and services
+| Layer | Technologies | Role |
+| --- | --- | --- |
+| Hosts and OS | **Rocky Linux 9**, bare-metal mini PCs | Cluster hosts and local disks |
+| Kubernetes | **RKE2**, **etcd** | Cluster orchestration and control-plane state |
+| Automation | **Ansible**, **Helm** | Host setup, cluster bootstrap, and package deployment |
+| GitOps | **Argo CD** | Declarative application deployment and reconciliation |
+| Networking | **Calico / Canal**, **MetalLB**, **kube-vip** | Pod networking, LoadBalancer IPs, and API endpoint availability |
+| Ingress and routing | **Traefik**, **Istio** (legacy/experimental), **Nginx** (manifests) | HTTP(S) ingress and traffic routing |
+| DNS and TLS | **Pi-hole**, **cert-manager**, **Let's Encrypt** | Local DNS, certificates, and service discovery |
+| Remote connectivity | **Tailscale** | Private remote access |
+| Storage | **Longhorn**, **NFS**, **Samba**, **XFS** | Persistent volumes, shared files, and host disks |
+| Observability | **Prometheus**, **Grafana**, **Loki** | Metrics, dashboards, and logs |
+| Delivery and source control | **Gitea**, **Jenkins** | Git hosting and CI automation |
 
-| Component | Purpose |
-| --- | --- |
-| **Kubernetes / RKE2** | Runs and coordinates containerized workloads across the homelab. |
-| **Nextcloud** | Self-hosted file storage, synchronization, and collaboration. |
-| **Immich** | Self-hosted photo and video management. |
-| **NFS** | Shared filesystem access for workloads that need network-mounted storage. |
-| **Samba** | File sharing with Windows and macOS clients. |
-| **Longhorn** | Kubernetes persistent block storage and replication for suitable workloads. |
-| **Argo CD** | GitOps-based management of Kubernetes applications. |
+### Cluster operations
 
-### Storage approach
+The cluster is organized around multiple RKE2 control-plane and worker nodes. Ansible manages node setup and lifecycle operations, including promotion, demotion, installation, removal, and supporting host configuration. Helm and Argo CD handle much of the Kubernetes-side deployment.
 
-Storage is an ongoing area of experimentation. NFS provides shared filesystem access, while Longhorn serves workloads that benefit from replicated Kubernetes block volumes. These solve different problems; neither automatically combines the capacity of separate NFS servers into a single pool.
+The cluster configuration lives under [`ansible-rke2/`](ansible-rke2/). The linked application configurations live in [CoreApplications](https://github.com/KingRiq/CoreApplications).
 
-The longer-term plan is to keep NFS exports on individual machines (Lunap, Diana, and Galaxia) and make the provisioned storage location explicit through separate StorageClasses.
+## Self-hosted services
 
-### Applications and websites
+The following services appear in the application repository or have been part of the homelab. Their presence here is an **inventory of managed or explored technologies**, not a live status report.
 
-- **Nextcloud:** Private file storage and collaboration.
-- **Immich:** Photo and video library management.
-- **Websites:** Explore container-image-based deployment for Saira's web portfolio and decide whether a self-hosted image registry is worthwhile.
-- **Future experiments:** Explore a self-hosted LLM-assisted music migration workflow as part of reducing reliance on Spotify.
+| Category | Services | Purpose |
+| --- | --- | --- |
+| Cloud and photos | **Nextcloud**, **Immich** | Personal file synchronization and photo/video management |
+| Media | **Jellyfin**, **Komga** | Streaming and reading libraries |
+| Media automation | **Sonarr**, **Radarr**, **Bazarr**, **Prowlarr**, **qBittorrent**, **Seerr / Overseerr**, **FlareSolverr** | Library management, downloads, indexing, and requests |
+| Developer tooling | **Gitea**, **Jenkins** | Git repositories and automated builds |
+| Files and synchronization | **File Browser**, **Syncthing**, **Unison** (experimental) | File management and synchronization between storage hosts |
+| Identity and secrets | **Keycloak** (experimental), **Vaultwarden** | Identity experiments and password management |
+| Infrastructure UI | **Rancher** (experimental / compatibility work) | Kubernetes administration |
+| DNS and networking | **Pi-hole**, **Tailscale**, **Traefik** | DNS, private connectivity, and ingress |
+| Platform maintenance | **Descheduler**, **Reloader** | Scheduling and configuration-change automation |
 
-## TODO
+Additional manifests and experiments may be found under `applications/`, `gitops/`, `temp/`, and `deprecated/` in CoreApplications.
 
-### Storage and data safety
+## Storage design
 
-- [ ] Review and clean up network file shares to reduce the risk of accidental deletion of important data.
-- [ ] Evaluate improved storage layouts, replication, and backup/recovery practices.
-- [ ] Document which workloads should use NFS versus Longhorn.
+Storage is one of the main ongoing projects.
 
-### NFS provisioner refactor
+- **Longhorn:** Kubernetes-managed block storage for persistent application data, with replica placement and NFS-based backup targets.
+- **NFS:** Shared network filesystems for workloads needing file access across pods and nodes.
+- **NFS subdirectory external provisioner:** Creates per-claim directories on a configured NFS export; each provisioner instance targets one backend.
+- **Samba:** SMB shares for Windows and macOS clients.
+- **XFS:** Filesystem used on attached host storage.
+- **Syncthing / Unison:** Explored for cross-host file synchronization; synchronization is not the same as a unified distributed filesystem.
 
-- [ ] Manage all three NFS provisioners through **one Argo CD multi-source Application**, using the official `nfs-subdir-external-provisioner` Helm chart three times—**no custom umbrella chart**.
-- [ ] Configure separate provisioner identities and StorageClasses for **Lunap**, **Diana**, and **Galaxia**.
-- [ ] Confirm each NFS Service address and exported path before deployment.
-- [ ] Add Alpine debug sidecars if the chart supports them; otherwise document an ephemeral debug-container workflow.
-- [ ] Check shared RBAC and cluster-scoped resource naming for collisions.
-- [ ] Plan migration carefully so existing PVs, PVCs, and backing directories are not accidentally deleted or orphaned.
+The goal is to simplify storage consumption without sacrificing visibility into where data lives, while keeping deletion and recovery behavior predictable.
 
-### Applications and documentation
+## Repository layout
 
-- [ ] Document Immich configuration and storage considerations.
-- [ ] Document the website deployment approach and container image hosting decision.
-- [ ] Investigate the feasibility of an LLM-assisted music migration workflow.
-- [x] Choose a domain for hosting services: **moonlightgrove.love** (rather than relying on GitHub Pages).
+```text
+KubernetesOps/
+├── README.md
+└── ansible-rke2/
+    ├── inventory/         # Cluster hosts and groups
+    ├── group_vars/        # Shared Ansible variables
+    ├── roles/             # RKE2 and infrastructure roles
+    ├── rke2.yml           # Main cluster playbook
+    ├── promote.yml        # Control-plane promotion
+    ├── demote.yml         # Control-plane demotion
+    ├── remove_worker.yml  # Worker lifecycle
+    └── Applications/      # Linked application repository
+```
 
-## Notes
+See [CoreApplications](https://github.com/KingRiq/CoreApplications) for Argo CD Applications, Helm values, Kubernetes manifests, ingress rules, and service configurations.
 
-This repository doubles as an operations notebook. Expect experiments, configuration revisions, and occasional commented-out code while the infrastructure evolves.
+## Roadmap and TODOs
+
+### Storage and safety
+
+- [ ] Audit NFS/SMB exports, mounts, and deletion behavior to reduce the risk of accidental data loss.
+- [ ] Improve backup, restore, and disaster-recovery documentation for NFS and Longhorn.
+- [ ] Document storage selection criteria for application configs, databases, and media.
+- [ ] Evaluate approaches to cross-host storage access and synchronization without assuming they form one shared pool.
+
+### Consolidate NFS provisioning under one Argo CD Application
+
+- [ ] Use **one Argo CD multi-source Application** referencing the official `nfs-subdir-external-provisioner` Helm chart **three times**, without building an umbrella chart.
+- [ ] Configure independent provisioners and StorageClasses for **Lunap**, **Diana**, and **Galaxia**.
+- [ ] Verify actual NFS Service endpoints and export paths.
+- [ ] Assess Alpine debug sidecars or ephemeral debug containers.
+- [ ] Check release naming and cluster-scoped RBAC for collisions.
+- [ ] Protect existing PVs/PVCs and backing directories during migration.
+
+### Documentation and experiments
+
+- [ ] Document service ownership, dependencies, and recovery steps.
+- [ ] Document the Immich and Nextcloud data paths and database recovery processes.
+- [ ] Explore container-image deployment for Saira's portfolio websites and whether a private image registry is needed.
+- [ ] Investigate an LLM-assisted music migration workflow.
+- [x] Select a domain for self-hosted services: **moonlightgrove.love**.
+
+## Related repositories
+
+- [**KubernetesOps**](https://github.com/KingRiq/KubernetesOps) — cluster operations and Ansible automation.
+- [**CoreApplications**](https://github.com/KingRiq/CoreApplications) — GitOps applications, Helm values, and Kubernetes manifests.
+
+---
+
+*Built to learn, experiment, break things safely, and improve the next iteration.*
