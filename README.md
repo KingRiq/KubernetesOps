@@ -132,7 +132,7 @@ KubernetesOps/
 
 - [ ] Document service ownership, dependencies, and recovery steps.
 - [ ] Document the Immich and Nextcloud data paths and database recovery processes.
-- [ ] Explore container-image deployment for Saira's portfolio websites and whether a private image registry is needed.
+- [ ] Explore container-image deployment for Saira's portfolio websites
 - [ ] Investigate an LLM-assisted music migration workflow.
 - [x] Select a domain for self-hosted services: **moonlightgrove.love**.
 
