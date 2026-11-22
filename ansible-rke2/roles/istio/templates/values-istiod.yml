@@ -3,3 +3,7 @@ meshConfig:
 pilot:
   autoscaleEnabled: true        # allow HPA for istiod
 defaultRevision: default        # mark this control plane as the default
+
+# Avoid Istio webhook failurePolicy drift when rendered by Argo CD.
+base:
+  validationFailurePolicy: Fail
