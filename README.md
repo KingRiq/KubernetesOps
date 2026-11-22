@@ -68,7 +68,6 @@ The following table describes the applications and platform components used in t
 | **NFS** | Shared network filesystem exports for workloads |
 | **NFS Subdir External Provisioner** | Dynamic provisioning of Kubernetes persistent volumes on NFS exports |
 | **Pi-hole** | Network DNS filtering and local DNS records |
-| **qBittorrent** | Download client for the media workflow |
 | **Rancher** | Kubernetes cluster administration interface |
 | **Reloader** | Restarting workloads when referenced ConfigMaps or Secrets change |
 | **Tailscale** | Private remote network connectivity |
